@@ -14,6 +14,8 @@
 
 #include <string>
 #include <stdexcept>
+#include <iostream>
+#include <cstddef>
 
 using namespace std;
 
@@ -25,28 +27,22 @@ const string IMAGE_PAIRS[] = {
 };
 
 string getImageId(const string& token) {
-
-	// check if the token is a number
 	try {
 		int index = stoi(token);
 		if (index >= 0 && index < sizeof(IMAGE_PAIRS) / sizeof(IMAGE_PAIRS[0])) {
 			return IMAGE_PAIRS[index];
-		} else {
-			throw out_of_range("Index out of range");
 		}
-	} catch (invalid_argument&) {
-		// not a number, treat as name
+		throw out_of_range("Index " + to_string(index) + " is out of range [0, " +
+		                    to_string(sizeof(IMAGE_PAIRS) / sizeof(IMAGE_PAIRS[0]) - 1) + "]");
+	} catch (const invalid_argument&) {
+		// Treat as name - could add validation here
 		return token;
-	}
-	catch (out_of_range&) {
-		// index out of range
-		throw;
 	}
 };
 
 void runCase(const string& image_pair) {
-	// Placeholder for the actual implementation of running a case
-	// This function would contain the logic to process the specified image pair
+	cout << "Processing image pair: " << image_pair << endl;
+	// TODO: Implement LP-SIFT algorithm for the image pair
 }
 
 int main(int argc, char* argv[]) {
