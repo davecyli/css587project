@@ -42,3 +42,10 @@
 
 # OS specific
 .DS_Store
+
+# Visual studio
+*.sln
+*.slnx
+*.vcxproj*
+.vs/
+x64/
