@@ -40,6 +40,9 @@
 # debug information files
 *.dwo
 
+# OS specific
+.DS_Store
+
 # Visual studio
 *.sln
 *.slnx
