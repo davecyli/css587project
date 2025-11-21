@@ -20,10 +20,12 @@
 #include <filesystem>
 #include <set>
 
+#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
 //#include <opencv2/xfeatures2d.hpp>
+#include <opencv2/imgproc.hpp>
 
 // #include "lpsift.h" temp commented out until lpsift.h is implemented
 
@@ -33,6 +35,9 @@ using namespace cv;
 namespace fs = std::filesystem;
 
 const string IMAGE_DIR = "images";
+
+int WINDOW_WIDTH = 800;
+int WINDOW_HEIGHT = 600;
 
 // Folder Structure
 // images/
@@ -44,26 +49,89 @@ const string IMAGE_DIR = "images";
 //       partofthisimage.jpg
 //   ...
 
-template <typename T> int computeMatches(const Mat& image1, const Mat& image2, Mat& matches_out, const Ptr<T>& detector) {
+int runCase(string set_name, const Mat& img1, const Mat& img2, const string& method_name, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
 	
-	vector<KeyPoint> keypoints1; // keypoint vectors
-	vector<KeyPoint> keypoints2;
+	Mat gray1, gray2;
 
-	Mat descriptors1; // descriptor matrices
-	Mat descriptors2;
+	cvtColor(img1, gray1, COLOR_BGR2GRAY);
+	cvtColor(img2, gray2, COLOR_BGR2GRAY);
 
-	detector->detectAndCompute(image1, noArray(), keypoints1, descriptors1); // detect and compute for image1 and image2
-	detector->detectAndCompute(image2, noArray(), keypoints2, descriptors2);
+	vector<KeyPoint> kpts1, kpts2;
+	Mat desc1, desc2;
 
-	Ptr<BFMatcher> matcher = BFMatcher::create();
+	detector->detectAndCompute(gray1, noArray(), kpts1, desc1);
+	detector->detectAndCompute(gray2, noArray(), kpts2, desc2);
 
+	cout << "Method: " << method_name << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
+
+	Ptr<BFMatcher> matcher = BFMatcher::create(matcher_norm);
 	vector<DMatch> matches;
-	matcher->match(descriptors1, descriptors2, matches); // match descriptors
+	matcher->match(desc1, desc2, matches);
 
-	//drawMatches(image1, keypoints1, image2, keypoints2, matches, matches_out); // draw matches on output image
+	// Get matched points
+	vector<Point2f> pts1, pts2;
+	for (auto& m : matches) {
+		pts1.push_back(kpts1[m.queryIdx].pt);
+		pts2.push_back(kpts2[m.trainIdx].pt);
+	}
+
+	setRNGSeed(12345); // for reproducibility
+
+	// Compute homography
+	Mat H = findHomography(pts1, pts2, RANSAC);
+
+	vector<Point2f> corners2 = {
+		Point2f(0,0),
+		Point2f(img2.cols,0),
+		Point2f(img2.cols,img2.rows),
+		Point2f(0,img2.rows)
+	};
+
+	vector<Point2f> warpedCorners2;
+	perspectiveTransform(corners2, warpedCorners2, H);
+
+	float minX = FLT_MAX, minY = FLT_MAX;
+	float maxX = -FLT_MAX, maxY = -FLT_MAX;
+
+	// Get overall min and max bounds of the resultant stitched image
+	for (auto& p : warpedCorners2)
+	{
+		minX = std::min(minX, p.x);
+		minY = std::min(minY, p.y);
+		maxX = std::max(maxX, p.x);
+		maxY = std::max(maxY, p.y);
+	}
+
+	int offsetX = (minX < 0) ? -minX : 0;
+	int offsetY = (minY < 0) ? -minY : 0;
+
+	int width = maxX - minX;
+	int height = maxY - minY;
+
+	Mat stitched = Mat::zeros(Size(width, height), img1.type());
+
+	Mat T = (Mat_<double>(3, 3) << // Shift homography
+		1, 0, offsetX,
+		0, 1, offsetY,
+		0, 0, 1);
+
+	Mat Hshifted = T * H;
+
+	warpPerspective(img1, stitched, Hshifted, Size(width, height));
+		
+	Mat roi(stitched, Rect(offsetX, offsetY, min(width - offsetX, img2.cols), min(height - offsetY, img2.rows)));
+	img2.copyTo(roi);
+
+	string windowName = "Stitched - " + set_name + " - " + method_name;
+	
+	// Get scale to fit desired window size
+	double scale = max(1.0, min(stitched.cols / (double)WINDOW_WIDTH, stitched.rows / (double)WINDOW_HEIGHT);
+	
+	namedWindow(windowName, WINDOW_NORMAL);
+	resizeWindow(windowName, (int)(stitched.cols / scale), (int)(stitched.rows / scale));
+	imshow(windowName, stitched);
 
 	return 0;
-
 }
 
 int main(int argc, char* argv[]) {
@@ -102,32 +170,30 @@ int main(int argc, char* argv[]) {
 
 				cout << "Processing image set: " << dir_name << endl;
 
-				cv::Mat imgRegistered = cv::imread(image_set_path + "/registered.jpg", cv::IMREAD_GRAYSCALE);
-				cv::Mat imgReferenced = cv::imread(image_set_path + "/referenced.jpg", cv::IMREAD_GRAYSCALE);
+				cv::Mat imgRegistered = cv::imread(image_set_path + "/registered.jpg");
+				cv::Mat imgReferenced = cv::imread(image_set_path + "/referenced.jpg");
 
-				cout << " - Running SIFT..." << endl;
-				// run SIFT
-				Ptr<SIFT> detectorSIFT = SIFT::create();
+				pair<Ptr<Feature2D>, NormTypes> detectors[] = {
+					//{SIFT::create(), NORM_L2},
+					{ORB::create(), NORM_HAMMING},
+					//{BRISK::create(), NORM_HAMMING},
+					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
+					//{LPSIFT::create(), NORM_HAMMING} // pending implementation
+				};
 
-				cout << " - Running ORB..." << endl;
-				// run ORB
-				Ptr<ORB> detectorORB = ORB::create();
+				for (auto detectorEntry : detectors) {
 
-				cout << " - Running BRISK..." << endl;
-				// run BRISK
-				Ptr<BRISK> detectorBRISK = BRISK::create();
+					Ptr<Feature2D> detector = detectorEntry.first;
+					NormTypes norm_type = detectorEntry.second;
 
-				cout << " - Running SURF..." << endl;
-				// run SURF
-				// SURF is in xfeatures2d which may not be included in all OpenCV builds
-
-				cout << " - Running LP-SIFT..." << endl;
-				// run LP-SIFT
-				//Ptr<LP_SIFT> detectorLPSIFT = LP_SIFT::create();
-
+					string method_name = typeid(*detector).name();
+					runCase(dir_name, imgRegistered, imgReferenced, method_name, detector, norm_type);
+				}
 			}
 
 		}
+
+		waitKey(0);
 	}
 	else {
 		throw runtime_error("Image directory does not exist: " + IMAGE_DIR);
