@@ -125,7 +125,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	string windowName = "Stitched - " + set_name + " - " + method_name;
 	
 	// Get scale to fit desired window size
-	double scale = max(1.0, min(stitched.cols / (double)WINDOW_WIDTH, stitched.rows / (double)WINDOW_HEIGHT);
+	double scale = max(1.0, min(stitched.cols / (double)WINDOW_WIDTH, stitched.rows / (double)WINDOW_HEIGHT));
 	
 	namedWindow(windowName, WINDOW_NORMAL);
 	resizeWindow(windowName, (int)(stitched.cols / scale), (int)(stitched.rows / scale));
@@ -166,7 +166,8 @@ int main(int argc, char* argv[]) {
 			int last_slash_index = image_set_path.rfind('/');
 			string dir_name = image_set_path.substr(last_slash_index==string::npos ? 0 : last_slash_index);
 
-			if (filtered_image_ids.contains(dir_name) || filtered_image_ids.empty()) {
+            // C++17: std::set::contains is C++20. Use find(...) != end() instead.
+            if (filtered_image_ids.empty() || filtered_image_ids.find(dir_name) != filtered_image_ids.end()) {
 
 				cout << "Processing image set: " << dir_name << endl;
 
