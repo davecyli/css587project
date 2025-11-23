@@ -20,31 +20,24 @@
 #include <filesystem>
 #include <set>
 
-#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
-//#include <opencv2/xfeatures2d.hpp>
-#include <opencv2/imgproc.hpp>
 
-// #include "lpsift.h" temp commented out until lpsift.h is implemented
+#include "lpsift.h"
 
 using namespace std;
-using namespace cv;
 
 namespace fs = std::filesystem;
 
 const string IMAGE_DIR = "images";
 
-int WINDOW_WIDTH = 800;
-int WINDOW_HEIGHT = 600;
-
 // Folder Structure
 // images/
-//    set1/ [any name]
+//    pair1/
 //       img1.jpg [these can be any name, and can index arbitrarily]
 //       img2.jpg [we can assume only 2 images per folder with our two-image tests]
-//    anotherset2/
+//    pair2/
 //       someimage.jpg
 //       partofthisimage.jpg
 //   ...
@@ -150,51 +143,46 @@ int main(int argc, char* argv[]) {
 
 	// Get all image pairs from the directory
 	if (fs::exists(IMAGE_DIR) && fs::is_directory(IMAGE_DIR)) {
-
-		vector<string> image_set_paths;
-
 		for (const auto& entry : fs::directory_iterator(IMAGE_DIR)) {
 			if (entry.is_directory()) {
-				image_set_paths.push_back(entry.path().string());
-			}
-		}
+				
+				string dir_name = entry.path().filename().string();
+				
+				if (filtered_image_ids.contains(dir_name) || filtered_image_ids.empty()) {
+					
+					cout << "Processing image set: " << dir_name << endl;
 
-		sort(image_set_paths.begin(), image_set_paths.end());
+					vector<string> image_paths;
 
-		for (string image_set_path : image_set_paths) {
-			
-			int last_slash_index = image_set_path.rfind('/');
-			string dir_name = image_set_path.substr(last_slash_index==string::npos ? 0 : last_slash_index);
+					for (const auto& image : fs::directory_iterator(entry.path())) {
+						image_paths.push_back(image.path().string());
+					}
 
             // C++17: std::set::contains is C++20. Use find(...) != end() instead.
             if (filtered_image_ids.empty() || filtered_image_ids.find(dir_name) != filtered_image_ids.end()) {
 
-				cout << "Processing image set: " << dir_name << endl;
+					for (int i = 0; i < image_paths.size(); i++) {
+						cout << " - Image [" << i << "]: " << image_paths[i] << endl;
+					}
 
-				cv::Mat imgRegistered = cv::imread(image_set_path + "/registered.jpg");
-				cv::Mat imgReferenced = cv::imread(image_set_path + "/referenced.jpg");
+					if (image_paths.size() != 2) {
+						cerr << "Warning: Expected 2 images in directory " << dir_name << ", found " << image_paths.size() << ". Skipping this set." << endl;
+						continue;
+					}
 
-				pair<Ptr<Feature2D>, NormTypes> detectors[] = {
-					//{SIFT::create(), NORM_L2},
-					{ORB::create(), NORM_HAMMING},
-					//{BRISK::create(), NORM_HAMMING},
-					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
-					//{LPSIFT::create(), NORM_HAMMING} // pending implementation
-				};
+					cout << " - Loading images..." << endl;
 
-				for (auto detectorEntry : detectors) {
+					cv::Mat img1 = cv::imread(image_paths[0], cv::IMREAD_GRAYSCALE);
+					cv::Mat img2 = cv::imread(image_paths[1], cv::IMREAD_GRAYSCALE);
 
-					Ptr<Feature2D> detector = detectorEntry.first;
-					NormTypes norm_type = detectorEntry.second;
+					cout << " - Running LP-SIFT on them..." << endl;
 
-					string method_name = typeid(*detector).name();
-					runCase(dir_name, imgRegistered, imgReferenced, method_name, detector, norm_type);
+					// run LP-SIFT on this image pair
+
 				}
+
 			}
-
 		}
-
-		waitKey(0);
 	}
 	else {
 		throw runtime_error("Image directory does not exist: " + IMAGE_DIR);
