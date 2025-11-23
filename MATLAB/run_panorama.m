@@ -7,7 +7,7 @@ tic;
 %montage(buildingScene.Files)
 
 %I = readimage(buildingScene,1);
-I = imread("49.jpg");
+I = imread("C:\repos\CSS587\css587project\images\mountains\reference.jpg");
 
 grayImage = im2gray(I);
 imshow(grayImage);
@@ -20,7 +20,9 @@ tforms(numImages) = projtform2d;
 
 imageSize = zeros(numImages, 2);
 
-images_list = ["49.jpg", "50.jpg"];
+images_list = [
+    "C:\repos\CSS587\css587project\images\mountains\reference.jpg",
+    "C:\repos\CSS587\css587project\images\mountains\registered.jpg"];
 
 for n = 2:numImages
     pointsPrevious = points;
