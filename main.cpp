@@ -10,6 +10,7 @@
  * Features included:
  *
  * Assumptions and constraints:
+ * - C++17 is used
  */
 
 #include <string>
@@ -80,6 +81,13 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	// Compute homography
 	Mat H = findHomography(pts1, pts2, RANSAC);
 
+	vector<Point2f> corners1 = {
+		Point2f(0,0),
+		Point2f(img1.cols,0),
+		Point2f(img1.cols,img1.rows),
+		Point2f(0,img1.rows)
+	};
+
 	vector<Point2f> corners2 = {
 		Point2f(0,0),
 		Point2f(img2.cols,0),
@@ -87,11 +95,18 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 		Point2f(0,img2.rows)
 	};
 
-	vector<Point2f> warpedCorners2;
-	perspectiveTransform(corners2, warpedCorners2, H);
-
 	float minX = FLT_MAX, minY = FLT_MAX;
 	float maxX = -FLT_MAX, maxY = -FLT_MAX;
+
+	vector<Point2f> warpedCorners2;
+	perspectiveTransform(corners2, warpedCorners2, H);
+	
+	for (auto& p : corners1) {
+		minX = std::min(minX, p.x);
+		minY = std::min(minY, p.y);
+		maxX = std::max(maxX, p.x);
+		maxY = std::max(maxY, p.y);
+	}
 
 	// Get overall min and max bounds of the resultant stitched image
 	for (auto& p : warpedCorners2)
@@ -105,8 +120,8 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	int offsetX = (minX < 0) ? -minX : 0;
 	int offsetY = (minY < 0) ? -minY : 0;
 
-	int width = maxX - minX;
-	int height = maxY - minY;
+	int width = (int)(maxX - minX + 1);
+	int height = (int)(maxY - minY + 1);
 
 	Mat stitched = Mat::zeros(Size(width, height), img1.type());
 
@@ -119,7 +134,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 
 	warpPerspective(img1, stitched, Hshifted, Size(width, height));
 
-	Mat roi(stitched, Rect(offsetX, offsetY, min(width - offsetX, img2.cols), min(height - offsetY, img2.rows)));
+	Mat roi(stitched, Rect(offsetX, offsetY, max(Hshifted.cols, img2.cols), max(Hshifted.rows, img2.rows)));
 	img2.copyTo(roi);
 
 	string windowName = "Stitched - " + set_name + " - " + method_name;
