@@ -44,7 +44,6 @@
 .DS_Store
 
 # Visual studio
-CppProperties.json
 *.sln
 *.slnx
 *.vcxproj*
