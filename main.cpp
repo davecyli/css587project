@@ -50,8 +50,7 @@ int WINDOW_HEIGHT = 600;
 //       partofthisimage.jpg
 //   ...
 
-int runCase(string set_name, const Mat& img1, const Mat& img2, const string& method_name, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
-
+int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
 	Mat gray1, gray2;
 
 	cvtColor(img1, gray1, COLOR_BGR2GRAY);
@@ -63,7 +62,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	detector->detectAndCompute(gray1, noArray(), kpts1, desc1);
 	detector->detectAndCompute(gray2, noArray(), kpts2, desc2);
 
-	cout << "Method: " << method_name << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
+	cout << "Method: " << detector->getDefaultName() << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
 
 	Ptr<BFMatcher> matcher = BFMatcher::create(matcher_norm);
 	vector<DMatch> matches;
@@ -137,7 +136,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	Mat roi(stitched, Rect(offsetX, offsetY, max(Hshifted.cols, img2.cols), max(Hshifted.rows, img2.rows)));
 	img2.copyTo(roi);
 
-	string windowName = "Stitched - " + set_name + " - " + method_name;
+	string windowName = "Stitched - " + set_name + " - " + detector->getDefaultName();
 
 	// Get scale to fit desired window size
 	double scale = max(1.0, min(stitched.cols / (double)WINDOW_WIDTH, stitched.rows / (double)WINDOW_HEIGHT));
@@ -201,9 +200,7 @@ int main(int argc, char* argv[]) {
 
 					Ptr<Feature2D> detector = detectorEntry.first;
 					NormTypes norm_type = detectorEntry.second;
-
-					string method_name = typeid(*detector).name();
-					runCase(dir_name, imgRegistered, imgReference, method_name, detector, norm_type);
+					runCase(dir_name, imgRegistered, imgReference, detector, norm_type);
 				}
 			}
 
