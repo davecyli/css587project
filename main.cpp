@@ -28,7 +28,7 @@
  //#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/imgproc.hpp>
 
-// #include "lpsift.h" temp commented out until lpsift.h is implemented
+#include "lpsift.h"
 
 using namespace std;
 using namespace cv;
@@ -50,8 +50,7 @@ int WINDOW_HEIGHT = 600;
 //       partofthisimage.jpg
 //   ...
 
-int runCase(string set_name, const Mat& img1, const Mat& img2, const string& method_name, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
-
+bool runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
 	Mat gray1, gray2;
 
 	cvtColor(img1, gray1, COLOR_BGR2GRAY);
@@ -63,11 +62,21 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	detector->detectAndCompute(gray1, noArray(), kpts1, desc1);
 	detector->detectAndCompute(gray2, noArray(), kpts2, desc2);
 
-	cout << "Method: " << method_name << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
+	cout << "Method: " << detector->getDefaultName() << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
+
+	if (kpts1.empty() || kpts2.empty() || desc1.empty() || desc2.empty()) {
+		cout << "Skipping " << detector->getDefaultName() << " due to empty keypoints/descriptors." << endl;
+		return false;
+	}
 
 	Ptr<BFMatcher> matcher = BFMatcher::create(matcher_norm);
 	vector<DMatch> matches;
 	matcher->match(desc1, desc2, matches);
+
+	if (matches.size() < 4) {
+		cout << "Skipping " << detector->getDefaultName() << " due to insufficient matches." << endl;
+		return false;
+	}
 
 	// Get matched points
 	vector<Point2f> pts1, pts2;
@@ -137,7 +146,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	Mat roi(stitched, Rect(offsetX, offsetY, max(Hshifted.cols, img2.cols), max(Hshifted.rows, img2.rows)));
 	img2.copyTo(roi);
 
-	string windowName = "Stitched - " + set_name + " - " + method_name;
+	string windowName = "Stitched - " + set_name + " - " + detector->getDefaultName();
 
 	// Get scale to fit desired window size
 	double scale = max(1.0, min(stitched.cols / (double)WINDOW_WIDTH, stitched.rows / (double)WINDOW_HEIGHT));
@@ -146,7 +155,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const string& met
 	resizeWindow(windowName, (int)(stitched.cols / scale), (int)(stitched.rows / scale));
 	imshow(windowName, stitched);
 
-	return 0;
+	return true;
 }
 
 int main(int argc, char* argv[]) {
@@ -176,6 +185,8 @@ int main(int argc, char* argv[]) {
 
 		sort(image_set_paths.begin(), image_set_paths.end());
 
+		bool anyDisplayed = false;
+
 		for (string image_set_path : image_set_paths) {
 
 			int last_slash_index = image_set_path.rfind('/');
@@ -194,22 +205,23 @@ int main(int argc, char* argv[]) {
 					{ORB::create(), NORM_HAMMING},
 					//{BRISK::create(), NORM_HAMMING},
 					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
-					//{LPSIFT::create(), NORM_HAMMING} // pending implementation
+					//{LPSIFT::create(), NORM_L2}
 				};
 
 				for (auto detectorEntry : detectors) {
 
 					Ptr<Feature2D> detector = detectorEntry.first;
 					NormTypes norm_type = detectorEntry.second;
-
-					string method_name = typeid(*detector).name();
-					runCase(dir_name, imgRegistered, imgReference, method_name, detector, norm_type);
+					bool shown = runCase(dir_name, imgRegistered, imgReference, detector, norm_type);
+					anyDisplayed = anyDisplayed || shown;
 				}
 			}
 
 		}
 
-		waitKey(0);
+		if (anyDisplayed) {
+			waitKey(0);
+		}
 	}
 	else {
 		throw runtime_error("Image directory does not exist: " + IMAGE_DIR);
