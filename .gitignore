@@ -49,3 +49,6 @@
 *.vcxproj*
 .vs/
 x64/
+
+# JetBrains
+.idea/
