@@ -58,7 +58,7 @@ void LPSIFT::detectAndCompute(InputArray image,
                               InputArray mask,
                               std::vector<KeyPoint>& keypoints,
                               OutputArray descriptors,
-                              bool useProvidedKeypoints) {
+                              const bool useProvidedKeypoints) {
     if (!useProvidedKeypoints) {
         detect(image, keypoints, mask);
     }

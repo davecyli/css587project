@@ -50,7 +50,7 @@ int WINDOW_HEIGHT = 600;
 //       partofthisimage.jpg
 //   ...
 
-int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
+bool runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature2D>& detector, NormTypes matcher_norm) {
 	Mat gray1, gray2;
 
 	cvtColor(img1, gray1, COLOR_BGR2GRAY);
@@ -66,7 +66,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature
 
 	if (kpts1.empty() || kpts2.empty() || desc1.empty() || desc2.empty()) {
 		cout << "Skipping " << detector->getDefaultName() << " due to empty keypoints/descriptors." << endl;
-		return 0;
+		return false;
 	}
 
 	Ptr<BFMatcher> matcher = BFMatcher::create(matcher_norm);
@@ -75,7 +75,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature
 
 	if (matches.size() < 4) {
 		cout << "Skipping " << detector->getDefaultName() << " due to insufficient matches." << endl;
-		return 0;
+		return false;
 	}
 
 	// Get matched points
@@ -155,7 +155,7 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature
 	resizeWindow(windowName, (int)(stitched.cols / scale), (int)(stitched.rows / scale));
 	imshow(windowName, stitched);
 
-	return 0;
+	return true;
 }
 
 int main(int argc, char* argv[]) {
@@ -185,6 +185,8 @@ int main(int argc, char* argv[]) {
 
 		sort(image_set_paths.begin(), image_set_paths.end());
 
+		bool anyDisplayed = false;
+
 		for (string image_set_path : image_set_paths) {
 
 			int last_slash_index = image_set_path.rfind('/');
@@ -200,23 +202,26 @@ int main(int argc, char* argv[]) {
 
 				pair<Ptr<Feature2D>, NormTypes> detectors[] = {
 					//{SIFT::create(), NORM_L2},
-					//{ORB::create(), NORM_HAMMING},
+					{ORB::create(), NORM_HAMMING},
 					//{BRISK::create(), NORM_HAMMING},
 					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
-					{LPSIFT::create(), NORM_L2}
+					//{LPSIFT::create(), NORM_L2}
 				};
 
 				for (auto detectorEntry : detectors) {
 
 					Ptr<Feature2D> detector = detectorEntry.first;
 					NormTypes norm_type = detectorEntry.second;
-					runCase(dir_name, imgRegistered, imgReference, detector, norm_type);
+					bool shown = runCase(dir_name, imgRegistered, imgReference, detector, norm_type);
+					anyDisplayed = anyDisplayed || shown;
 				}
 			}
 
 		}
 
-		waitKey(0);
+		if (anyDisplayed) {
+			waitKey(0);
+		}
 	}
 	else {
 		throw runtime_error("Image directory does not exist: " + IMAGE_DIR);
