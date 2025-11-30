@@ -7,20 +7,29 @@ tic;
 %montage(buildingScene.Files)
 
 %I = readimage(buildingScene,1);
-I = imread("49.jpg");
+% determine script folder (works on macOS, Linux, Windows)
+scriptDir = fileparts(mfilename('fullpath'));
+if isempty(scriptDir)
+    scriptDir = pwd;
+end
+
+% images are located relative to the script (../images/mountains)
+imagesDir = fullfile(scriptDir, '..', 'images', 'mountains');
+refPath = fullfile(imagesDir, 'reference.jpg');
+regPath = fullfile(imagesDir, 'registered.jpg');
+
+I = imread(refPath);
 
 grayImage = im2gray(I);
 imshow(grayImage);
 points = detectSURFFeatures(grayImage);
 [features,points] = extractFeatures(grayImage,points);
 
-%numImages = numel(buildingScene.Files);
-numImages = 2;
+images_list = [string(refPath), string(regPath)];
+numImages = numel(images_list);
+
 tforms(numImages) = projtform2d;
-
 imageSize = zeros(numImages, 2);
-
-images_list = ["49.jpg", "50.jpg"];
 
 for n = 2:numImages
     pointsPrevious = points;
