@@ -51,7 +51,7 @@ void LPSIFT::compute(InputArray image,
         gray = src;
     }
 
-    descriptor_->compute(gray, keypoints, descriptors);
+    descriptor_->compute(gray, keypoints, descriptors); // Use SIFT descriptor compute implementation
 }
 
 void LPSIFT::detectAndCompute(InputArray image,

@@ -7,14 +7,14 @@ class LPSIFT final : public cv::Feature2D {
 public:
     static cv::Ptr<LPSIFT> create();
 
-    // Public to allow cv::makePtr; prefer factory method for clarity.
+    // Public to allow cv::makePtr;
     LPSIFT();
 
-    cv::String getDefaultName() const override;
+    cv::String getDefaultName() const override; // NOLINT(modernize-use-nodiscard) matching OpenCV base signature
 
     void detect(cv::InputArray image,
                 std::vector<cv::KeyPoint>& keypoints,
-                cv::InputArray mask = cv::noArray()) override;
+                cv::InputArray mask) override;
 
     void compute(cv::InputArray image,
                  std::vector<cv::KeyPoint>& keypoints,
@@ -24,10 +24,10 @@ public:
                           cv::InputArray mask,
                           std::vector<cv::KeyPoint>& keypoints,
                           cv::OutputArray descriptors,
-                          bool useProvidedKeypoints = false) override;
+                          bool useProvidedKeypoints) override;
 
 private:
-    cv::Ptr<cv::Feature2D> descriptor_; // placeholder descriptor (e.g., SIFT)
+    cv::Ptr<cv::Feature2D> descriptor_; // placeholder for SIFT descriptor
 };
 
 #endif //LPSIFT_H

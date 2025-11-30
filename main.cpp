@@ -64,9 +64,19 @@ int runCase(string set_name, const Mat& img1, const Mat& img2, const Ptr<Feature
 
 	cout << "Method: " << detector->getDefaultName() << ", Keypoints Image 1: " << kpts1.size() << ", Keypoints Image 2: " << kpts2.size() << endl;
 
+	if (kpts1.empty() || kpts2.empty() || desc1.empty() || desc2.empty()) {
+		cout << "Skipping " << detector->getDefaultName() << " due to empty keypoints/descriptors." << endl;
+		return 0;
+	}
+
 	Ptr<BFMatcher> matcher = BFMatcher::create(matcher_norm);
 	vector<DMatch> matches;
 	matcher->match(desc1, desc2, matches);
+
+	if (matches.size() < 4) {
+		cout << "Skipping " << detector->getDefaultName() << " due to insufficient matches." << endl;
+		return 0;
+	}
 
 	// Get matched points
 	vector<Point2f> pts1, pts2;
@@ -190,10 +200,10 @@ int main(int argc, char* argv[]) {
 
 				pair<Ptr<Feature2D>, NormTypes> detectors[] = {
 					//{SIFT::create(), NORM_L2},
-					{ORB::create(), NORM_HAMMING},
+					//{ORB::create(), NORM_HAMMING},
 					//{BRISK::create(), NORM_HAMMING},
 					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
-					//{LPSIFT::create(), NORM_L2}
+					{LPSIFT::create(), NORM_L2}
 				};
 
 				for (auto detectorEntry : detectors) {
