@@ -52,3 +52,11 @@ x64/
 
 # JetBrains
 .idea/
+
+# Build directories
+build/
+out/
+
+# Benchmark output
+results.csv
+benchmark_output/
