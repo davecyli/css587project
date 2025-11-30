@@ -28,7 +28,7 @@
  //#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/imgproc.hpp>
 
-// #include "lpsift.h" temp commented out until lpsift.h is implemented
+#include "lpsift.h"
 
 using namespace std;
 using namespace cv;
@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
 					{ORB::create(), NORM_HAMMING},
 					//{BRISK::create(), NORM_HAMMING},
 					//{SURF::create(), NORM_HAMMING}, // in xfeatures2d
-					//{LPSIFT::create(), NORM_HAMMING} // pending implementation
+					//{LPSIFT::create(), NORM_L2}
 				};
 
 				for (auto detectorEntry : detectors) {
