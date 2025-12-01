@@ -7,17 +7,16 @@
 class LPSIFT final : public cv::Feature2D {
 public:
     static cv::Ptr<LPSIFT> create(
-        const std::vector<int>& windowSizes = {256, 512},
+        const std::vector<int>& windowSizes = {8, 32},
         float linearNoiseAlpha = 1e-6f,
         float beta0 = 0.1f,
         int subregionGrid = 4);
 
-    // Public to allow cv::makePtr
-    explicit LPSIFT(
-        const std::vector<int>& windowSizes = {256, 512},
-        float linearNoiseAlpha = 1e-6f,
-        float beta0 = 0.1f,
-        int subregionGrid = 4);
+    // Public to allow cv::makePtr; defaults are defined only on create().
+    explicit LPSIFT(const std::vector<int>& windowSizes,
+                    float linearNoiseAlpha,
+                    float beta0,
+                    int subregionGrid);
 
     cv::String getDefaultName() const override; // NOLINT(modernize-use-nodiscard) matching OpenCV base signature
 

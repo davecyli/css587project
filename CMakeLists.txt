@@ -17,10 +17,14 @@ add_executable(css587project
 target_include_directories(css587project PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(css587project PRIVATE ${OpenCV_LIBS})
 
-# Copy images into the built binary's directory (handles Debug/Release via TARGET_FILE_DIR)
-add_custom_command(TARGET css587project POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:css587project>/images
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/images
-            $<TARGET_FILE_DIR:css587project>/images
-    COMMENT "Copying images assets next to the executable")
+# Define the destination directory variable
+set(OUTPUT_IMAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/images")
+
+# Delete the output directory if it exists.
+# REMOVE_RECURSE is safe to call even if the path doesn't exist.
+file(REMOVE_RECURSE "${OUTPUT_IMAGE_DIR}")
+
+# Copy the images folder from source to the binary output directory
+# This command automatically creates the destination path if needed.
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/images" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+

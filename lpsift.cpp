@@ -30,6 +30,13 @@ inline uint64_t makeKey(int x, int y, int L) {
 }
 } // namespace
 
+Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
+                           const float linearNoiseAlpha,
+                           const float beta0,
+                           const int subregionGrid) {
+    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha, beta0, subregionGrid);
+}
+
 LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
                const float linearNoiseAlpha,
                const float beta0,
@@ -39,13 +46,6 @@ LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
       linearNoiseAlpha_(linearNoiseAlpha),
       beta0_(beta0),
       subregionGrid_(std::max(1, subregionGrid)) {}
-
-Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
-                           const float linearNoiseAlpha,
-                           const float beta0,
-                           const int subregionGrid) {
-    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha, beta0, subregionGrid);
-}
 
 String LPSIFT::getDefaultName() const {
     return "Feature2D.LPSIFT";
