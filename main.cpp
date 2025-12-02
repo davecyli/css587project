@@ -37,7 +37,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/features2d.hpp>
-// #include <opencv2/xfeatures2d.hpp>  // Uncomment for SURF support
+#include <opencv2/xfeatures2d.hpp>  // Uncomment for SURF support
 #include <opencv2/imgproc.hpp>
 
 #include "lpsift.h"
@@ -253,12 +253,12 @@ int runBenchmark(const string& outputFile, bool saveImages) {
 	runner.addDetector("BRISK", BRISK::create(), NORM_HAMMING, "x");
 
 	// SURF - uncomment if xfeatures2d is available
-	// runner.addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2, "x");
+	runner.addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2, "x");
 
 	// LP-SIFT - uses L2 norm (like SIFT) with window sizes
 	// Note: LP-SIFT detection is being implemented by teammate
 	// When ready, uncomment:
-	runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
+	//runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
 
 	cout << "Image directory: " << IMAGE_DIR << endl;
 	cout << "Output file: " << outputFile << endl;
@@ -369,8 +369,8 @@ int runDemo(const set<string>& filteredImageIds, bool showDisplay) {
 				{SIFT::create(), NORM_L2},
 				{ORB::create(), NORM_HAMMING},
 				{BRISK::create(), NORM_HAMMING},
-				// {xfeatures2d::SURF::create(), NORM_L2},  // Uncomment if xfeatures2d available
-				// {LPSIFT::create(), NORM_L2}  // Uncomment when LP-SIFT detection is implemented
+				{xfeatures2d::SURF::create(), NORM_L2},  // Uncomment if xfeatures2d available
+				//{LPSIFT::create(), NORM_L2}  // Uncomment when LP-SIFT detection is implemented
 			};
 
 			for (auto& detectorEntry : detectors) {
