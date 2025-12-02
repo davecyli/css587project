@@ -258,7 +258,7 @@ int runBenchmark(const string& outputFile, bool saveImages) {
 	// LP-SIFT - uses L2 norm (like SIFT) with window sizes
 	// Note: LP-SIFT detection is being implemented by teammate
 	// When ready, uncomment:
-	// runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
+	runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
 
 	cout << "Image directory: " << IMAGE_DIR << endl;
 	cout << "Output file: " << outputFile << endl;
