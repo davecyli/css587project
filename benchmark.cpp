@@ -53,13 +53,7 @@ void CSVExporter::writeHeader() {
     file.close();
 }
 
-std::string q(std::string s) {
-	return "\"" + s + "\"";
-}
-
-std::string q(int s) {
-    return "\"" + std::to_string(s) + "\"";
-}
+namespace {
 
 std::string escapeCsv(const std::string& s) {
     std::string r;
@@ -87,6 +81,8 @@ std::string makeCsvRow(const Args... args) {
     }
     return row.str();
 }
+
+} // anonymous namespace
 
 void CSVExporter::writeMetrics(const StitchingMetrics& m) {
     std::ofstream file(filename_, std::ios::out | std::ios::app);
@@ -116,7 +112,7 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
         StitchingMetrics::formatTime(m.totalStitchingTime),
         (m.stitchingSuccess ? "Yes" : "No"),
         m.failureReason
-	);
+    );
 
     file << csvRow << "\n";
 
