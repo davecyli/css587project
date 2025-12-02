@@ -53,6 +53,41 @@ void CSVExporter::writeHeader() {
     file.close();
 }
 
+std::string q(std::string s) {
+	return "\"" + s + "\"";
+}
+
+std::string q(int s) {
+    return "\"" + std::to_string(s) + "\"";
+}
+
+std::string escapeCsv(const std::string& s) {
+    std::string r;
+    for (char c : s)
+        r += (c == '"') ? "\"\"" : std::string(1, c);
+    return r;
+}
+
+template <typename T>
+std::string toString(const T& value) {
+    std::ostringstream ss;
+    ss << value;
+    return ss.str();
+}
+
+template <typename... Args>
+std::string makeCsvRow(const Args... args) {
+    std::vector<std::string> items = { escapeCsv(toString(args))... };
+
+    std::ostringstream row;
+    for (size_t i = 0; i < items.size(); ++i) {
+        row << "\"" << items[i] << "\"";
+        if (i + 1 < items.size())
+            row << ",";
+    }
+    return row.str();
+}
+
 void CSVExporter::writeMetrics(const StitchingMetrics& m) {
     std::ofstream file(filename_, std::ios::out | std::ios::app);
     if (!file.is_open()) {
@@ -60,27 +95,30 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
         return;
     }
 
-    file << m.datasetName << ","
-         << imageSizeCategoryToString(m.sizeCategory) << ","
-         << m.algorithmName << ","
-         << m.getReferenceResolution() << ","
-         << m.getRegisteredResolution() << ","
-         << m.numKeypointsReference << ","
-         << m.numKeypointsRegistered << ","
-         << m.numMatches << ","
-         << m.numInliers << ","
-         << m.windowSizes << ","
-         << StitchingMetrics::formatTime(m.detectionTimeReference) << ","
-         << StitchingMetrics::formatTime(m.detectionTimeRegistered) << ","
-         << StitchingMetrics::formatTime(m.descriptorTimeReference) << ","
-         << StitchingMetrics::formatTime(m.descriptorTimeRegistered) << ","
-         << StitchingMetrics::formatTime(m.matchingTime) << ","
-         << StitchingMetrics::formatTime(m.homographyTime) << ","
-         << StitchingMetrics::formatTime(m.warpingTime) << ","
-         << StitchingMetrics::formatTime(m.totalStitchingTime) << ","
-         << (m.stitchingSuccess ? "Yes" : "No") << ","
-         << m.failureReason
-         << "\n";
+    std::string csvRow = makeCsvRow(
+        m.datasetName,
+        imageSizeCategoryToString(m.sizeCategory),
+        m.algorithmName,
+        m.getReferenceResolution(),
+        m.getRegisteredResolution(),
+        m.numKeypointsReference,
+        m.numKeypointsRegistered,
+        m.numMatches,
+        m.numInliers,
+        m.windowSizes,
+        StitchingMetrics::formatTime(m.detectionTimeReference),
+        StitchingMetrics::formatTime(m.detectionTimeRegistered),
+        StitchingMetrics::formatTime(m.descriptorTimeReference),
+        StitchingMetrics::formatTime(m.descriptorTimeRegistered),
+        StitchingMetrics::formatTime(m.matchingTime),
+        StitchingMetrics::formatTime(m.homographyTime),
+        StitchingMetrics::formatTime(m.warpingTime),
+        StitchingMetrics::formatTime(m.totalStitchingTime),
+        (m.stitchingSuccess ? "Yes" : "No"),
+        m.failureReason
+	);
+
+    file << csvRow << "\n";
 
     file.close();
 }
