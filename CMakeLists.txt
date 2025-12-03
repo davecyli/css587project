@@ -11,6 +11,7 @@ find_package(OpenCV REQUIRED)
 add_executable(css587project
     main.cpp
     lpsift.cpp
+    benchmark.cpp
 )
 
 target_include_directories(css587project PRIVATE ${OpenCV_INCLUDE_DIRS})
