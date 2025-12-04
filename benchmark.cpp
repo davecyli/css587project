@@ -419,7 +419,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
             clearDetectors(); // Clear previous detectors if any
 
             addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
-            addDetector("ORB", ORB::create(), NORM_HAMMING);
+            addDetector("ORB", ORB::create(250000), NORM_HAMMING);
             addDetector("BRISK", BRISK::create(), NORM_HAMMING);
             addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
 
