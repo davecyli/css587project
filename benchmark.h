@@ -16,11 +16,15 @@
 #include <sstream>
 #include <iomanip>
 #include <filesystem>
+#include <set>
 
 #include <opencv2/core.hpp>
 #include <opencv2/features2d.hpp>
 
 namespace fs = std::filesystem;
+
+using namespace cv;
+using namespace std;
 
 // ============================================================================
 // Constants
@@ -63,6 +67,20 @@ inline ImageSizeCategory getImageSizeCategory(int width, int height) {
     if (pixels < 1000000) return ImageSizeCategory::SMALL;       // < 1 MP
     if (pixels < 3000000) return ImageSizeCategory::MEDIUM;      // 1-3 MP
     return ImageSizeCategory::LARGE;                              // > 3 MP
+}
+
+inline std::vector<int> getWindowSize(int width, int height) {
+    ImageSizeCategory category = getImageSizeCategory(width, height);
+    switch (category) {
+        case ImageSizeCategory::SMALL:
+            return {32, 40};
+        case ImageSizeCategory::MEDIUM:
+            return {32, 64};
+        case ImageSizeCategory::LARGE:
+            return {256, 512};
+        default:
+            return {32, 64};
+    }
 }
 
 // ============================================================================
@@ -184,7 +202,6 @@ public:
         std::string name;
         cv::Ptr<cv::Feature2D> detector;
         cv::NormTypes matcherNorm;
-        std::string windowSizes;
     };
 
     BenchmarkRunner() = default;
@@ -192,8 +209,9 @@ public:
     // Add a detector to benchmark
     void addDetector(const std::string& name,
                      cv::Ptr<cv::Feature2D> detector,
-                     cv::NormTypes norm,
-                     const std::string& windowSizes = "x");
+                     cv::NormTypes norm);
+
+    void clearDetectors();
 
     // Run benchmark on a single image pair
     StitchingMetrics runSingleBenchmark(
@@ -201,22 +219,22 @@ public:
         const cv::Mat& referenceImg,
         const cv::Mat& registeredImg,
         const DetectorConfig& config,
-        bool saveStitchedImage = false,
-        const std::string& outputPath = "");
+		const vector<int>& lpsiftWindowSizes,
+        const std::string& outputPath);
 
     // Run benchmark on all detectors for a single image pair
     std::vector<StitchingMetrics> runAllDetectors(
         const std::string& datasetName,
         const cv::Mat& referenceImg,
         const cv::Mat& registeredImg,
-        bool saveStitchedImages = false,
-        const std::string& outputPath = "");
+		const vector<int>& lpsiftWindowSizes,
+        const std::string& outputPath);
 
     // Run benchmark on all image sets in a directory
     std::vector<StitchingMetrics> runOnDirectory(
-        const std::string& imageDir,
-        bool saveStitchedImages = false,
-        const std::string& outputPath = "");
+        const string& imageDir,
+        const set<string>& filteredImageSets,
+        const string& outputPath);
 
     // Print summary table (similar to paper's Table 2)
     static void printSummaryTable(const std::vector<StitchingMetrics>& results);

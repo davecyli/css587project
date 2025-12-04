@@ -16,6 +16,11 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/calib3d.hpp>
+#include <opencv2/xfeatures2d.hpp>
+#include "lpsift.h"
+
+using namespace cv;
+using namespace std;
 
 // ============================================================================
 // CSVExporter Implementation
@@ -132,9 +137,48 @@ void CSVExporter::writeAllMetrics(const std::vector<StitchingMetrics>& metrics) 
 
 void BenchmarkRunner::addDetector(const std::string& name,
                                    cv::Ptr<cv::Feature2D> detector,
-                                   cv::NormTypes norm,
-                                   const std::string& windowSizes) {
-    detectors_.push_back({name, detector, norm, windowSizes});
+                                   cv::NormTypes norm) {
+    detectors_.push_back({name, detector, norm});
+}
+
+void BenchmarkRunner::clearDetectors() {
+    detectors_.clear();
+}
+
+void naiveBruteForceMatch(
+    const cv::Mat& desc1,
+    const cv::Mat& desc2,
+    float threshold,
+    vector<DMatch>& matches
+)
+{
+    matches.clear();
+    matches.reserve(50000);   // reserve memory (optional)
+
+    for (int i = 0; i < desc1.rows; i++)
+    {
+        const float* d1 = desc1.ptr<float>(i);
+
+        for (int j = 0; j < desc2.rows; j++)
+        {
+            float dist = cv::norm(desc1.row(i), desc2.row(j), cv::NORM_L2);
+
+            if (dist < threshold)
+            {
+                matches.emplace_back(i, j, dist);
+            }
+        }
+    }
+}
+
+
+string joinInts(const vector<int>& v) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < v.size(); i++) {
+        if (i > 0) oss << ",";
+        oss << v[i];
+    }
+    return oss.str();
 }
 
 StitchingMetrics BenchmarkRunner::runSingleBenchmark(
@@ -142,13 +186,14 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
     const cv::Mat& referenceImg,
     const cv::Mat& registeredImg,
     const DetectorConfig& config,
-    bool saveStitchedImage,
+	const vector<int>& lpsiftWindowSizes,
     const std::string& outputPath
 ) {
     StitchingMetrics metrics;
     metrics.datasetName = datasetName;
     metrics.algorithmName = config.name;
-    metrics.windowSizes = config.windowSizes;
+
+    metrics.windowSizes = joinInts(lpsiftWindowSizes);
 
     // Record image dimensions
     metrics.referenceWidth = referenceImg.cols;
@@ -276,7 +321,7 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
 
         // Image warping and blending
         stepTimer.start();
-        cv::Mat stitched = warpAndBlend(referenceImg, registeredImg, H);
+        cv::Mat stitched = warpAndBlend(registeredImg, referenceImg, H);
         stepTimer.stop();
         metrics.warpingTime = stepTimer.elapsedSeconds();
 
@@ -285,7 +330,7 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         metrics.stitchingSuccess = true;
 
         // Save stitched image if requested
-        if (saveStitchedImage && !outputPath.empty()) {
+        if (!outputPath.empty()) {
             std::string outFile = outputPath + "/" + datasetName + "_" + config.name + "_stitched.jpg";
             cv::imwrite(outFile, stitched);
         }
@@ -304,7 +349,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runAllDetectors(
     const std::string& datasetName,
     const cv::Mat& referenceImg,
     const cv::Mat& registeredImg,
-    bool saveStitchedImages,
+	const vector<int>& windowSizes,
     const std::string& outputPath
 ) {
     std::vector<StitchingMetrics> results;
@@ -313,8 +358,8 @@ std::vector<StitchingMetrics> BenchmarkRunner::runAllDetectors(
         std::cout << "  Running " << config.name << "..." << std::flush;
 
         StitchingMetrics metrics = runSingleBenchmark(
-            datasetName, referenceImg, registeredImg, config,
-            saveStitchedImages, outputPath
+            datasetName, referenceImg, registeredImg, config, windowSizes,
+            outputPath
         );
 
         if (metrics.stitchingSuccess) {
@@ -332,9 +377,9 @@ std::vector<StitchingMetrics> BenchmarkRunner::runAllDetectors(
 }
 
 std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
-    const std::string& imageDir,
-    bool saveStitchedImages,
-    const std::string& outputPath
+    const string& imageDir,
+	const set<string>& filteredImageSets,
+    const string& outputPath
 ) {
     std::vector<StitchingMetrics> allResults;
 
@@ -354,23 +399,44 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
 
     for (const auto& setPath : imageSets) {
         std::string setName = fs::path(setPath).filename().string();
-        std::cout << "\nProcessing: " << setName << std::endl;
 
-        // Load images (registered.jpg and reference.jpg as per main.cpp convention)
-        cv::Mat registered = cv::imread(setPath + "/registered.jpg");
-        cv::Mat reference = cv::imread(setPath + "/reference.jpg");
+        if (filteredImageSets.empty() || filteredImageSets.find(setName) != filteredImageSets.end()) {
+            
+            std::cout << "\nProcessing: " << setName << std::endl;
 
-        if (registered.empty() || reference.empty()) {
-            std::cerr << "  Warning: Could not load images from " << setPath << std::endl;
-            continue;
+            // Load images (registered.jpg and reference.jpg as per main.cpp convention)
+            cv::Mat registered = cv::imread(setPath + "/registered.jpg");
+            cv::Mat reference = cv::imread(setPath + "/reference.jpg");
+
+            if (registered.empty() || reference.empty()) {
+                std::cerr << "  Warning: Could not load images from " << setPath << std::endl;
+                continue;
+            }
+
+            std::cout << "  Reference: " << reference.cols << "x" << reference.rows
+                << ", Registered: " << registered.cols << "x" << registered.rows << std::endl;
+
+            clearDetectors(); // Clear previous detectors if any
+
+            addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
+            addDetector("ORB", ORB::create(250000), NORM_HAMMING);
+            addDetector("BRISK", BRISK::create(), NORM_HAMMING);
+            addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+
+            std::vector<int> windowSizes = getWindowSize(reference.cols, reference.rows);
+
+            std::cout << "  Using window sizes L = " << joinInts(windowSizes) << std::endl;
+
+            addDetector("LP-SIFT", LPSIFT::create(
+                windowSizes
+            ), NORM_L2);
+
+            auto results = runAllDetectors(setName, reference, registered,
+                windowSizes, outputPath);
+            allResults.insert(allResults.end(), results.begin(), results.end());
+
         }
 
-        std::cout << "  Reference: " << reference.cols << "x" << reference.rows
-                  << ", Registered: " << registered.cols << "x" << registered.rows << std::endl;
-
-        auto results = runAllDetectors(setName, reference, registered,
-                                       saveStitchedImages, outputPath);
-        allResults.insert(allResults.end(), results.begin(), results.end());
     }
 
     return allResults;
@@ -430,13 +496,18 @@ cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, 
         cv::Point2f(0, static_cast<float>(img2.rows))
     };
 
+	float minX = FLT_MAX, minY = FLT_MAX;
+	float maxX = -FLT_MAX, maxY = -FLT_MAX;
+
     std::vector<cv::Point2f> warpedCorners2;
     cv::perspectiveTransform(corners2, warpedCorners2, H);
 
-    // Calculate bounds
-    float minX = 0, minY = 0;
-    float maxX = static_cast<float>(img1.cols);
-    float maxY = static_cast<float>(img1.rows);
+    for (auto& p : corners1) {
+        minX = std::min(minX, p.x);
+        minY = std::min(minY, p.y);
+        maxX = std::max(maxX, p.x);
+        maxY = std::max(maxY, p.y);
+	}
 
     for (const auto& p : warpedCorners2) {
         minX = std::min(minX, p.x);
@@ -447,8 +518,12 @@ cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, 
 
     int offsetX = (minX < 0) ? static_cast<int>(-minX) : 0;
     int offsetY = (minY < 0) ? static_cast<int>(-minY) : 0;
+
     int width = static_cast<int>(maxX - minX + 1);
     int height = static_cast<int>(maxY - minY + 1);
+    
+    // Warp and blend
+    cv::Mat stitched = cv::Mat::zeros(cv::Size(width, height), img1.type());
 
     // Create translation matrix
     cv::Mat T = (cv::Mat_<double>(3, 3) <<
@@ -458,17 +533,10 @@ cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, 
 
     cv::Mat Hshifted = T * H;
 
-    // Warp and blend
-    cv::Mat stitched = cv::Mat::zeros(cv::Size(width, height), img1.type());
-    cv::warpPerspective(img1, stitched, Hshifted, cv::Size(width, height));
+    cv::warpPerspective(img2, stitched, Hshifted, cv::Size(width, height));
 
-    // Copy img2 to ROI
-    int roiWidth = std::min(img2.cols, width - offsetX);
-    int roiHeight = std::min(img2.rows, height - offsetY);
-    if (roiWidth > 0 && roiHeight > 0) {
-        cv::Mat roi(stitched, cv::Rect(offsetX, offsetY, roiWidth, roiHeight));
-        img2(cv::Rect(0, 0, roiWidth, roiHeight)).copyTo(roi);
-    }
+	cv::Rect roi(offsetX, offsetY, img1.cols, img1.rows);
+	img1.copyTo(stitched(roi));
 
     return stitched;
 }
