@@ -244,21 +244,21 @@ int runBenchmark(const string& outputFile, bool saveImages) {
 
 	// Add all detectors to benchmark (matching paper's Table 2)
 	// SIFT - uses L2 norm for matching
-	runner.addDetector("SIFT", SIFT::create(), NORM_L2, "x");
+	//runner.addDetector("SIFT", SIFT::create(), NORM_L2, "x");
 
 	// ORB - uses Hamming distance
-	runner.addDetector("ORB", ORB::create(), NORM_HAMMING, "x");
+	//runner.addDetector("ORB", ORB::create(), NORM_HAMMING, "x");
 
 	// BRISK - uses Hamming distance
-	runner.addDetector("BRISK", BRISK::create(), NORM_HAMMING, "x");
+	//runner.addDetector("BRISK", BRISK::create(), NORM_HAMMING, "x");
 
 	// SURF - uncomment if xfeatures2d is available
-	runner.addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2, "x");
+	//runner.addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2, "x");
 
 	// LP-SIFT - uses L2 norm (like SIFT) with window sizes
 	// Note: LP-SIFT detection is being implemented by teammate
 	// When ready, uncomment:
-	//runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
+	runner.addDetector("LP-SIFT", LPSIFT::create(), NORM_L2, "[32,64]");
 
 	cout << "Image directory: " << IMAGE_DIR << endl;
 	cout << "Output file: " << outputFile << endl;
@@ -366,11 +366,11 @@ int runDemo(const set<string>& filteredImageIds, bool showDisplay) {
 			// Define detectors to test
 			// Uncomment/comment as needed
 			pair<Ptr<Feature2D>, NormTypes> detectors[] = {
-				{SIFT::create(), NORM_L2},
-				{ORB::create(), NORM_HAMMING},
-				{BRISK::create(), NORM_HAMMING},
-				{xfeatures2d::SURF::create(), NORM_L2},  // Uncomment if xfeatures2d available
-				//{LPSIFT::create(), NORM_L2}  // Uncomment when LP-SIFT detection is implemented
+				//{SIFT::create(), NORM_L2},
+				//{ORB::create(), NORM_HAMMING},
+				//{BRISK::create(), NORM_HAMMING},
+				//{xfeatures2d::SURF::create(), NORM_L2},  // Uncomment if xfeatures2d available
+				{LPSIFT::create(), NORM_L2}  // Uncomment when LP-SIFT detection is implemented
 			};
 
 			for (auto& detectorEntry : detectors) {
