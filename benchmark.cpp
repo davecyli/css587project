@@ -193,7 +193,12 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
     metrics.datasetName = datasetName;
     metrics.algorithmName = config.name;
 
-    metrics.windowSizes = joinInts(lpsiftWindowSizes);
+    // Only set window sizes for LP-SIFT algorithm, use "x" for others
+    if (config.name == "LP-SIFT") {
+        metrics.windowSizes = joinInts(lpsiftWindowSizes);
+    } else {
+        metrics.windowSizes = "x";
+    }
 
     // Record image dimensions
     metrics.referenceWidth = referenceImg.cols;
