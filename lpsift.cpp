@@ -16,77 +16,74 @@
 #include <opencv2/features2d.hpp>
 
 #include <algorithm>
-#include <cmath>
-#include <unordered_set>
+#include <numeric>
 
 using namespace cv;
 
-namespace {
-// Hash key for deduplication: include scale to allow the same location at different L values.
-inline uint64_t makeKey(int x, int y, int L) {
-    return (static_cast<uint64_t>(static_cast<uint32_t>(L)) << 40) ^
-           (static_cast<uint64_t>(static_cast<uint32_t>(y)) << 20) ^
-           static_cast<uint32_t>(x);
-}
-} // namespace
-
 Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
-                           const float linearNoiseAlpha,
-                           const float beta0,
-                           const int subregionGrid) {
-    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha, beta0, subregionGrid);
+                           const float linearNoiseAlpha) {
+    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha);
 }
 
 LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
-               const float linearNoiseAlpha,
-               const float beta0,
-               const int subregionGrid)
+               const float linearNoiseAlpha)
     : descriptor_(SIFT::create()),
       windowSizes_(windowSizes),
-      linearNoiseAlpha_(linearNoiseAlpha),
-      beta0_(beta0),
-      subregionGrid_(std::max(1, subregionGrid)) {}
+      linearNoiseAlpha_(linearNoiseAlpha) {}
 
 String LPSIFT::getDefaultName() const {
     return "Feature2D.LPSIFT";
 }
 
-float LPSIFT::computePatchSize(const int windowSize) const {
-    if (windowSize <= 0) return 0.0f;
-
-    int Lmax = windowSize;
-    if (!windowSizes_.empty()) {
-        Lmax = *std::max_element(windowSizes_.begin(), windowSizes_.end());
-    }
-
-    const float beta = beta0_ * std::pow(static_cast<float>(windowSize) / static_cast<float>(Lmax), -0.5f);
-    const float rawSize = beta * static_cast<float>(windowSize) * static_cast<float>(subregionGrid_);
-
-    // Clamp to avoid degenerate patches and to stay inside the window.
-    return std::clamp(rawSize, 4.0f, static_cast<float>(windowSize));
-}
-
+// Step 1: Image Preprocessing
+// Adds alpha * (y * cols + x) to each pixel to break flat plateaus deterministically.
+// Based on 𝑀𝑛,𝑘(𝑖,𝑗)=𝑀𝑘(𝑖,𝑗)+[(𝑖−1)∗𝑛𝑐𝑘 +𝑗]∗𝛼 where 𝛼 ≪ 1 is the linearNoiseAlpha
+// Precondition: image.type() == CV_32F
 void LPSIFT::addLinearRamp(Mat& image) const {
+    // Input checks
     if (linearNoiseAlpha_ <= 0.0f || image.empty()) return;
-    CV_Assert(image.type() == CV_32F || image.type() == CV_32FC1);
 
-    const int cols = image.cols;
-    for (int y = 0; y < image.rows; ++y) {
-        float* row = image.ptr<float>(y);
-        const float base = linearNoiseAlpha_ * static_cast<float>(y * cols);
-        for (int x = 0; x < cols; ++x) {
-            row[x] += base + linearNoiseAlpha_ * static_cast<float>(x);
-        }
-    }
+    // Pre-compute ramp and add to image
+    Mat ramp(image.rows, image.cols, CV_32F);
+    float* data = ramp.ptr<float>();
+    std::iota(data, data + ramp.total(), 0.0f); // 0,1,2,... in raster order
+    ramp *= linearNoiseAlpha_;
+    image += ramp;
 }
 
+bool LPSIFT::addKeypointCandidate(int x,
+                                  int y,
+                                  int windowSize,
+                                  int octaveIndex,
+                                  float response,
+                                  int cols,
+                                  int rows,
+                                  std::vector<KeyPoint>& out) const {
+    if (x < 0 || y < 0 || x >= cols || y >= rows || windowSize <= 1) return false;
+
+    const float size = static_cast<float>(windowSize);
+    KeyPoint kp(Point2f(static_cast<float>(x), static_cast<float>(y)), size);
+    kp.response = response;
+    kp.angle = -1.0f; // let SIFT assign orientation during compute()
+    kp.octave = octaveIndex;
+    kp.class_id = windowSize; // store interrogation window size for analysis
+    out.push_back(kp);
+    return true;
+}
+
+// Step 2: Feature Point Detection
+// This function integrates addLinearRamp (Step 1) in the call.
+// Precondition: windowSizes_ is not empty.
 void LPSIFT::detect(InputArray image,
                     std::vector<KeyPoint>& keypoints,
                     InputArray mask) {
+    (void)mask; // Mask input is kept for API compatibility. Not implemented.
     keypoints.clear();
 
-    Mat src = image.getMat();
-    if (src.empty()) return;
+    // Early exit if image is empty
+    if (image.empty()) return;
+
+    const Mat src = image.getMat();
 
     Mat gray;
     if (src.channels() > 1) {
@@ -98,68 +95,35 @@ void LPSIFT::detect(InputArray image,
     gray.convertTo(gray, CV_32F);
     addLinearRamp(gray);
 
-    Mat mask8u;
-    if (!mask.empty()) {
-        mask.getMat().convertTo(mask8u, CV_8U);
-        if (mask8u.size() != gray.size()) {
-            // Mismatched mask size; ignore the mask to avoid indexing errors.
-            mask8u.release();
-        }
-    }
-
-    std::vector<int> defaultWindows{64};
-    const std::vector<int>& windows = windowSizes_.empty() ? defaultWindows : windowSizes_;
-
     const int rows = gray.rows;
     const int cols = gray.cols;
 
-    std::unordered_set<uint64_t> seen;
-
-    auto tryAddKeypoint = [&](int x, int y, int L, float response) {
-        if (x < 0 || y < 0 || x >= cols || y >= rows) return;
-        uint64_t key = makeKey(x, y, L);
-        if (!seen.insert(key).second) return;
-
-        KeyPoint kp(Point2f(static_cast<float>(x), static_cast<float>(y)), computePatchSize(L));
-        kp.response = response;
-        kp.angle = -1.0f;      // let SIFT assign orientation during compute()
-        kp.octave = 0;         // keep octave at 0 to satisfy SIFT's expectations
-        kp.class_id = L;       // store interrogation window size for analysis
-        keypoints.push_back(kp);
-    };
-
-    for (int L : windows) {
-        if (L <= 0) continue;
-
+    for (size_t idx = 0; idx < windowSizes_.size(); ++idx) {
+        const int L = windowSizes_[idx];
+        if (L <= 1) continue; // Skip degenerate 1x1 tiles
         for (int y = 0; y < rows; y += L) {
             const int h = std::min(L, rows - y);
             for (int x = 0; x < cols; x += L) {
                 const int w = std::min(L, cols - x);
+                if (h <= 1 || w <= 1) continue; // avoid 1x1 (or 1xN/Nx1) tiles
                 Rect roi(x, y, w, h);
 
                 Mat tile = gray(roi);
                 double minVal = 0.0, maxVal = 0.0;
                 Point minLoc, maxLoc;
 
-                if (!mask8u.empty()) {
-                    Mat maskROI = mask8u(roi);
-                    if (countNonZero(maskROI) == 0) continue;
-                    minMaxLoc(tile, &minVal, &maxVal, &minLoc, &maxLoc, maskROI);
-                } else {
-                    minMaxLoc(tile, &minVal, &maxVal, &minLoc, &maxLoc);
-                }
+                minMaxLoc(tile, &minVal, &maxVal, &minLoc, &maxLoc);
 
                 const int gxMax = x + maxLoc.x;
                 const int gyMax = y + maxLoc.y;
                 const int gxMin = x + minLoc.x;
                 const int gyMin = y + minLoc.y;
+                const float response = static_cast<float>(maxVal - minVal);
 
-                // Add the maximum peak
-                tryAddKeypoint(gxMax, gyMax, L, static_cast<float>(maxVal - minVal));
-
-                // Add the minimum peak if it is distinct
+                // Add both extrema; skip duplicate when they coincide.
+                addKeypointCandidate(gxMax, gyMax, L, static_cast<int>(idx), response, cols, rows, keypoints);
                 if (gxMin != gxMax || gyMin != gyMax) {
-                    tryAddKeypoint(gxMin, gyMin, L, static_cast<float>(maxVal - minVal));
+                    addKeypointCandidate(gxMin, gyMin, L, static_cast<int>(idx), response, cols, rows, keypoints);
                 }
             }
         }
