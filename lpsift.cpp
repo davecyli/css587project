@@ -59,7 +59,7 @@ bool LPSIFT::addKeypointCandidate(int x,
                                   int cols,
                                   int rows,
                                   std::vector<KeyPoint>& out) const {
-    if (x < 0 || y < 0 || x >= cols || y >= rows || windowSize <= 1) return false;
+    if (x < 0 || y < 0 || x >= cols || y >= rows || windowSize <= 0) return false;
 
     const float size = static_cast<float>(windowSize);
     KeyPoint kp(Point2f(static_cast<float>(x), static_cast<float>(y)), size);
@@ -73,7 +73,7 @@ bool LPSIFT::addKeypointCandidate(int x,
 
 // Step 2: Feature Point Detection
 // This function integrates addLinearRamp (Step 1) in the call.
-// Precondition: windowSizes_ is not empty.
+// Precondition: windowSizes_ is not empty and that the value is greater than 1
 void LPSIFT::detect(InputArray image,
                     std::vector<KeyPoint>& keypoints,
                     InputArray mask) {
@@ -100,12 +100,10 @@ void LPSIFT::detect(InputArray image,
 
     for (size_t idx = 0; idx < windowSizes_.size(); ++idx) {
         const int L = windowSizes_[idx];
-        if (L <= 1) continue; // Skip degenerate 1x1 tiles
         for (int y = 0; y < rows; y += L) {
             const int h = std::min(L, rows - y);
             for (int x = 0; x < cols; x += L) {
                 const int w = std::min(L, cols - x);
-                if (h <= 1 || w <= 1) continue; // avoid 1x1 (or 1xN/Nx1) tiles
                 Rect roi(x, y, w, h);
 
                 Mat tile = gray(roi);
@@ -120,20 +118,17 @@ void LPSIFT::detect(InputArray image,
                 const int gyMin = y + minLoc.y;
                 const float response = static_cast<float>(maxVal - minVal);
 
-                // Add both extrema; skip duplicate when they coincide.
                 addKeypointCandidate(gxMax, gyMax, L, static_cast<int>(idx), response, cols, rows, keypoints);
-                if (gxMin != gxMax || gyMin != gyMax) {
-                    addKeypointCandidate(gxMin, gyMin, L, static_cast<int>(idx), response, cols, rows, keypoints);
-                }
+                addKeypointCandidate(gxMin, gyMin, L, static_cast<int>(idx), response, cols, rows, keypoints);
             }
         }
     }
 
-    // Keep the strongest peaks first (helps downstream limitKeypoints calls).
-    std::sort(keypoints.begin(), keypoints.end(),
-              [](const KeyPoint& a, const KeyPoint& b) {
-                  return a.response > b.response;
-              });
+    // // Keep the strongest peaks first (helps downstream limitKeypoints calls).
+    // std::sort(keypoints.begin(), keypoints.end(),
+    //           [](const KeyPoint& a, const KeyPoint& b) {
+    //               return a.response > b.response;
+    //           });
 }
 
 void LPSIFT::compute(InputArray image,

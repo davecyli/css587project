@@ -7,7 +7,7 @@
 class LPSIFT final : public cv::Feature2D {
 public:
     static cv::Ptr<LPSIFT> create(
-        const std::vector<int>& windowSizes = {128, 40},
+        const std::vector<int>& windowSizes = {16, 40, 128},
         float linearNoiseAlpha = 1e-6f);
 
     // Public to allow cv::makePtr; defaults are defined only on create().
