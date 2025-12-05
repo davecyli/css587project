@@ -73,7 +73,7 @@ void printUsage(const char* programName) {
 }
 
 // Helper function to limit keypoints by keeping the strongest ones
-// Uses MAX_KEYPOINTS constant from benchmark.h
+// Uses MAX_KEYPOINTS_BF constant from benchmark.h for BFMatcher limit
 void limitKeypoints(vector<KeyPoint>& kpts, int maxCount) {
 	if (static_cast<int>(kpts.size()) > maxCount) {
 		// Sort by response (strength) descending and keep top N

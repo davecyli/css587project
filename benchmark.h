@@ -30,8 +30,15 @@ using namespace std;
 // Constants
 // ============================================================================
 
-// Maximum keypoints to prevent OpenCV BFMatcher overflow (IMGIDX_ONE limit ~65536)
-constexpr int MAX_KEYPOINTS = 50000;
+// Maximum keypoints for BFMatcher (IMGIDX_ONE limit ~65536)
+// FLANN matcher has no practical limit
+constexpr int MAX_KEYPOINTS_BF = 50000;
+
+// Matcher types
+enum class MatcherType {
+    BRUTE_FORCE,  // Exact matching, limited to ~65k keypoints
+    FLANN         // Approximate matching, handles millions of keypoints
+};
 
 // Minimum matches required for homography estimation
 constexpr size_t MIN_MATCHES = 4;
@@ -202,6 +209,7 @@ public:
         std::string name;
         cv::Ptr<cv::Feature2D> detector;
         cv::NormTypes matcherNorm;
+        MatcherType matcherType = MatcherType::FLANN;  // Default to FLANN for no keypoint limit
     };
 
     BenchmarkRunner() = default;
@@ -209,7 +217,8 @@ public:
     // Add a detector to benchmark
     void addDetector(const std::string& name,
                      cv::Ptr<cv::Feature2D> detector,
-                     cv::NormTypes norm);
+                     cv::NormTypes norm,
+                     MatcherType matcherType = MatcherType::FLANN);
 
     void clearDetectors();
 
