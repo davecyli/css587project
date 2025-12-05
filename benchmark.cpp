@@ -22,6 +22,18 @@
 using namespace cv;
 using namespace std;
 
+// Helper function to limit keypoints by keeping the strongest ones
+static void limitKeypoints(std::vector<cv::KeyPoint>& kpts, size_t maxCount) {
+    if (kpts.size() > maxCount) {
+        // Sort by response (strength) descending and keep top N
+        std::sort(kpts.begin(), kpts.end(),
+            [](const cv::KeyPoint& a, const cv::KeyPoint& b) {
+                return a.response > b.response;
+            });
+        kpts.resize(maxCount);
+    }
+}
+
 // ============================================================================
 // CSVExporter Implementation
 // ============================================================================
@@ -137,8 +149,9 @@ void CSVExporter::writeAllMetrics(const std::vector<StitchingMetrics>& metrics) 
 
 void BenchmarkRunner::addDetector(const std::string& name,
                                    cv::Ptr<cv::Feature2D> detector,
-                                   cv::NormTypes norm) {
-    detectors_.push_back({name, detector, norm});
+                                   cv::NormTypes norm,
+                                   MatcherType matcherType) {
+    detectors_.push_back({name, detector, norm, matcherType});
 }
 
 void BenchmarkRunner::clearDetectors() {
@@ -242,16 +255,13 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
             return metrics;
         }
 
-        // Check if keypoints exceed BFMatcher limit (~65536 due to IMGIDX_ONE)
-        // Document as failure rather than artificially limiting results
-        if (kpts1.size() > MAX_KEYPOINTS || kpts2.size() > MAX_KEYPOINTS) {
-            metrics.stitchingSuccess = false;
-            metrics.failureReason = "Too many keypoints (ref=" + std::to_string(kpts1.size()) +
-                                    ", reg=" + std::to_string(kpts2.size()) +
-                                    ", limit=" + std::to_string(MAX_KEYPOINTS) + ")";
-            totalTimer.stop();
-            metrics.totalStitchingTime = totalTimer.elapsedSeconds();
-            return metrics;
+        // Limit keypoints only for BFMatcher (has ~65536 limit due to IMGIDX_ONE)
+        // FLANN can handle unlimited keypoints
+        if (config.matcherType == MatcherType::BRUTE_FORCE) {
+            limitKeypoints(kpts1, MAX_KEYPOINTS_BF);
+            limitKeypoints(kpts2, MAX_KEYPOINTS_BF);
+            metrics.numKeypointsReference = static_cast<int>(kpts1.size());
+            metrics.numKeypointsRegistered = static_cast<int>(kpts2.size());
         }
 
         // Descriptor computation - Reference image
@@ -279,11 +289,43 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
             return metrics;
         }
 
-        // Feature matching using BFMatcher (as per paper)
+        // Feature matching
         stepTimer.start();
-        cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(config.matcherNorm);
         std::vector<cv::DMatch> matches;
-        matcher->match(desc1, desc2, matches);
+
+        if (config.matcherType == MatcherType::FLANN) {
+            // FLANN matcher - can handle unlimited keypoints
+            cv::Ptr<cv::DescriptorMatcher> matcher;
+
+            if (config.matcherNorm == cv::NORM_HAMMING || config.matcherNorm == cv::NORM_HAMMING2) {
+                // Binary descriptors (ORB, BRISK) - use LSH index
+                cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2);
+                cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+                matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
+            } else {
+                // Float descriptors (SIFT) - use KDTree index
+                cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::KDTreeIndexParams>(5);
+                cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+                matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
+            }
+
+            // Use knnMatch with ratio test for better quality matches
+            std::vector<std::vector<cv::DMatch>> knnMatches;
+            matcher->knnMatch(desc1, desc2, knnMatches, 2);
+
+            // Apply Lowe's ratio test
+            const float ratioThresh = 0.75f;
+            for (const auto& knn : knnMatches) {
+                if (knn.size() >= 2 && knn[0].distance < ratioThresh * knn[1].distance) {
+                    matches.push_back(knn[0]);
+                }
+            }
+        } else {
+            // BFMatcher - exact matching but limited to ~65k keypoints
+            cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(config.matcherNorm);
+            matcher->match(desc1, desc2, matches);
+        }
+
         stepTimer.stop();
         metrics.matchingTime = stepTimer.elapsedSeconds();
         metrics.numMatches = static_cast<int>(matches.size());
@@ -426,7 +468,8 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
             addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
             addDetector("ORB", ORB::create(250000), NORM_HAMMING);
             addDetector("BRISK", BRISK::create(), NORM_HAMMING);
-            addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+            // SURF is patented and disabled in standard OpenCV builds
+            // addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
 
             std::vector<int> windowSizes = getWindowSize(reference.cols, reference.rows);
 
