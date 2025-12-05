@@ -308,7 +308,7 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         stepTimer.start();
         cv::setRNGSeed(RNG_SEED);
         std::vector<uchar> inlierMask;
-        cv::Mat H = cv::findHomography(pts1, pts2, cv::RANSAC, RANSAC_THRESHOLD, inlierMask);
+        cv::Mat H = cv::findHomography(pts2, pts1, cv::RANSAC, RANSAC_THRESHOLD, inlierMask);
         stepTimer.stop();
         metrics.homographyTime = stepTimer.elapsedSeconds();
 
@@ -485,36 +485,36 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
     std::cout << std::string(120, '=') << std::endl;
 }
 
-cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& H) {
-    // Calculate corners of warped image
-    std::vector<cv::Point2f> corners1 = {
+cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& imgToWarp, const cv::Mat& baseImg, const cv::Mat& H) {
+    // Calculate corners of images
+    std::vector<cv::Point2f> cornersWarp = {
         cv::Point2f(0, 0),
-        cv::Point2f(static_cast<float>(img1.cols), 0),
-        cv::Point2f(static_cast<float>(img1.cols), static_cast<float>(img1.rows)),
-        cv::Point2f(0, static_cast<float>(img1.rows))
+        cv::Point2f(static_cast<float>(imgToWarp.cols), 0),
+        cv::Point2f(static_cast<float>(imgToWarp.cols), static_cast<float>(imgToWarp.rows)),
+        cv::Point2f(0, static_cast<float>(imgToWarp.rows))
     };
 
-    std::vector<cv::Point2f> corners2 = {
+    std::vector<cv::Point2f> cornersBase = {
         cv::Point2f(0, 0),
-        cv::Point2f(static_cast<float>(img2.cols), 0),
-        cv::Point2f(static_cast<float>(img2.cols), static_cast<float>(img2.rows)),
-        cv::Point2f(0, static_cast<float>(img2.rows))
+        cv::Point2f(static_cast<float>(baseImg.cols), 0),
+        cv::Point2f(static_cast<float>(baseImg.cols), static_cast<float>(baseImg.rows)),
+        cv::Point2f(0, static_cast<float>(baseImg.rows))
     };
 
 	float minX = FLT_MAX, minY = FLT_MAX;
 	float maxX = -FLT_MAX, maxY = -FLT_MAX;
 
-    std::vector<cv::Point2f> warpedCorners2;
-    cv::perspectiveTransform(corners2, warpedCorners2, H);
+    std::vector<cv::Point2f> warpedCorners;
+    cv::perspectiveTransform(cornersWarp, warpedCorners, H);
 
-    for (auto& p : corners1) {
+    for (const auto& p : warpedCorners) {
         minX = std::min(minX, p.x);
         minY = std::min(minY, p.y);
         maxX = std::max(maxX, p.x);
         maxY = std::max(maxY, p.y);
 	}
 
-    for (const auto& p : warpedCorners2) {
+    for (const auto& p : cornersBase) {
         minX = std::min(minX, p.x);
         minY = std::min(minY, p.y);
         maxX = std::max(maxX, p.x);
@@ -528,7 +528,7 @@ cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, 
     int height = static_cast<int>(maxY - minY + 1);
     
     // Warp and blend
-    cv::Mat stitched = cv::Mat::zeros(cv::Size(width, height), img1.type());
+    cv::Mat stitched = cv::Mat::zeros(cv::Size(width, height), baseImg.type());
 
     // Create translation matrix
     cv::Mat T = (cv::Mat_<double>(3, 3) <<
@@ -538,10 +538,12 @@ cv::Mat BenchmarkRunner::warpAndBlend(const cv::Mat& img1, const cv::Mat& img2, 
 
     cv::Mat Hshifted = T * H;
 
-    cv::warpPerspective(img2, stitched, Hshifted, cv::Size(width, height));
+    // First warp the secondary image, then place the reference on top
+    cv::warpPerspective(imgToWarp, stitched, Hshifted, cv::Size(width, height),
+        cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 
-	cv::Rect roi(offsetX, offsetY, img1.cols, img1.rows);
-	img1.copyTo(stitched(roi));
+    cv::Rect roi(offsetX, offsetY, baseImg.cols, baseImg.rows);
+    baseImg.copyTo(stitched(roi));
 
     return stitched;
 }
