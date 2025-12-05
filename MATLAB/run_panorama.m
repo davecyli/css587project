@@ -14,7 +14,7 @@ if isempty(scriptDir)
 end
 
 % images are located relative to the script (../images/mountains)
-imagesDir = fullfile(scriptDir, '..', 'images', 'mountains');
+imagesDir = fullfile(scriptDir, '..', 'images', 'mountain');
 refPath = fullfile(imagesDir, 'reference.jpg');
 regPath = fullfile(imagesDir, 'registered.jpg');
 
@@ -88,11 +88,12 @@ yLimits = [yMin, yMax];
 
 panoramaView = imref2d([height width], xLimits, yLimits);
 
-for idx = 1:numImages
-    %I = readimage(buildingScene,idx);
-    I = imread(images_list(idx));
-    warpedImage = imwarp(I,tforms(idx),OutputView=panoramaView);
-    mask = imwarp(true(size(I,1),size(I,2)),tforms(idx),OutputView=panoramaView);
+% Blend non-reference images first, then place the reference on top
+blendOrder = [2:numImages 1];
+for ii = blendOrder
+    I = imread(images_list(ii));
+    warpedImage = imwarp(I,tforms(ii),OutputView=panoramaView);
+    mask = imwarp(true(size(I,1),size(I,2)),tforms(ii),OutputView=panoramaView);
     panorama = imblend(warpedImage,panorama,mask,foregroundopacity=1);
 end
 
