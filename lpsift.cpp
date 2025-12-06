@@ -335,3 +335,162 @@ void LPSIFT::detectAndCompute(InputArray image,
 
     compute(image, keypoints, descriptors);
 }
+
+// ============================================================================
+// SIFTWithLPDescriptor Implementation
+// Uses SIFT detector with LP-SIFT's custom 64-dim descriptor
+// ============================================================================
+
+Ptr<SIFTWithLPDescriptor> SIFTWithLPDescriptor::create() {
+    return makePtr<SIFTWithLPDescriptor>();
+}
+
+SIFTWithLPDescriptor::SIFTWithLPDescriptor()
+    : siftDetector_(SIFT::create()) {}
+
+String SIFTWithLPDescriptor::getDefaultName() const {
+    return "Feature2D.SIFTWithLPDescriptor";
+}
+
+void SIFTWithLPDescriptor::detect(InputArray image,
+                                   std::vector<KeyPoint>& keypoints,
+                                   InputArray mask) {
+    siftDetector_->detect(image, keypoints, mask);
+}
+
+// Compute LP-SIFT style descriptor for SIFT keypoints
+void SIFTWithLPDescriptor::computeDescriptor(const cv::Mat& gray,
+                                              const cv::KeyPoint& kpt,
+                                              float* descriptor) const {
+    const int d = LPSIFT::SPATIAL_BINS;  // 4
+    const int n = LPSIFT::ORIENT_BINS;   // 4
+
+    std::fill(descriptor, descriptor + LPSIFT::DESCRIPTOR_SIZE, 0.0f);
+
+    const float kptX = kpt.pt.x;
+    const float kptY = kpt.pt.y;
+    // Use keypoint size as the scale (SIFT provides this)
+    const float kptSize = std::max(kpt.size, 4.0f);
+
+    // Calculate radius based on keypoint size (similar to MATLAB hist_width calculation)
+    int radius = static_cast<int>(std::round(kptSize * 2));
+    if (radius < d) radius = d;
+
+    const float radiusPerBin = static_cast<float>(radius) / d;
+
+    // Loop through each spatial bin
+    for (int ii = 0; ii < d; ++ii) {
+        for (int jj = 0; jj < d; ++jj) {
+            float hist[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+            for (float i = -radiusPerBin; i <= radiusPerBin; i += 1.0f) {
+                for (float j = -radiusPerBin; j <= radiusPerBin; j += 1.0f) {
+                    int globalY = static_cast<int>(std::floor(kptY + i + (ii - d/2) * radiusPerBin));
+                    int globalX = static_cast<int>(std::floor(kptX + j + (jj - d/2) * radiusPerBin));
+
+                    if (globalY > 0 && globalY < gray.rows - 1 &&
+                        globalX > 0 && globalX < gray.cols - 1) {
+                        float dx = static_cast<float>(gray.at<uchar>(globalY, globalX + 1)) -
+                                   static_cast<float>(gray.at<uchar>(globalY, globalX - 1));
+                        float dy = static_cast<float>(gray.at<uchar>(globalY - 1, globalX)) -
+                                   static_cast<float>(gray.at<uchar>(globalY + 1, globalX));
+
+                        if (dx >= 0) {
+                            hist[0] += dx;
+                        } else {
+                            hist[2] += dx;
+                        }
+
+                        if (dy >= 0) {
+                            hist[1] += dy;
+                        } else {
+                            hist[3] += dy;
+                        }
+                    }
+                }
+            }
+
+            int descIdx = (ii * d + jj) * n;
+            for (int k = 0; k < n; ++k) {
+                descriptor[descIdx + k] = hist[k];
+            }
+        }
+    }
+
+    // Normalize descriptor
+    float norm = 0.0f;
+    for (int i = 0; i < LPSIFT::DESCRIPTOR_SIZE; ++i) {
+        norm += descriptor[i] * descriptor[i];
+    }
+    norm = std::sqrt(norm);
+
+    if (norm > 1e-7f) {
+        float threshold = 0.2f * norm;
+        for (int i = 0; i < LPSIFT::DESCRIPTOR_SIZE; ++i) {
+            descriptor[i] = std::min(descriptor[i], threshold);
+            descriptor[i] = std::max(descriptor[i], -threshold);
+        }
+
+        norm = 0.0f;
+        for (int i = 0; i < LPSIFT::DESCRIPTOR_SIZE; ++i) {
+            norm += descriptor[i] * descriptor[i];
+        }
+        norm = std::sqrt(norm);
+
+        if (norm > 1e-7f) {
+            for (int i = 0; i < LPSIFT::DESCRIPTOR_SIZE; ++i) {
+                descriptor[i] /= norm;
+            }
+        }
+    }
+}
+
+void SIFTWithLPDescriptor::compute(InputArray image,
+                                    std::vector<KeyPoint>& keypoints,
+                                    OutputArray descriptors) {
+    if (keypoints.empty()) {
+        descriptors.release();
+        return;
+    }
+
+    Mat src = image.getMat();
+    if (src.empty()) {
+        descriptors.release();
+        return;
+    }
+
+    Mat gray;
+    if (src.channels() > 1) {
+        cvtColor(src, gray, COLOR_BGR2GRAY);
+    } else {
+        gray = src;
+    }
+
+    if (gray.type() != CV_8U) {
+        gray.convertTo(gray, CV_8U);
+    }
+
+    descriptors.create(static_cast<int>(keypoints.size()), LPSIFT::DESCRIPTOR_SIZE, CV_32F);
+    Mat desc = descriptors.getMat();
+
+    for (size_t i = 0; i < keypoints.size(); ++i) {
+        computeDescriptor(gray, keypoints[i], desc.ptr<float>(static_cast<int>(i)));
+    }
+}
+
+void SIFTWithLPDescriptor::detectAndCompute(InputArray image,
+                                             InputArray mask,
+                                             std::vector<KeyPoint>& keypoints,
+                                             OutputArray descriptors,
+                                             const bool useProvidedKeypoints) {
+    if (!useProvidedKeypoints) {
+        detect(image, keypoints, mask);
+    }
+
+    if (keypoints.empty()) {
+        descriptors.release();
+        return;
+    }
+
+    compute(image, keypoints, descriptors);
+}

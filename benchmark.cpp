@@ -468,8 +468,10 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
             addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
             addDetector("ORB", ORB::create(250000), NORM_HAMMING);
             addDetector("BRISK", BRISK::create(), NORM_HAMMING);
-            // SURF is patented and disabled in standard OpenCV builds
-            // addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+            addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+
+            // Hybrid: SIFT detector + LP-SIFT custom descriptor (to isolate descriptor speedup)
+            addDetector("SIFT+LP-Desc", SIFTWithLPDescriptor::create(), NORM_L2);
 
             std::vector<int> windowSizes = getWindowSize(reference.cols, reference.rows);
 

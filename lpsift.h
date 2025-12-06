@@ -73,4 +73,43 @@ private:
                               std::vector<cv::KeyPoint>& out) const;
 };
 
+/*
+ * SIFTWithLPDescriptor: Hybrid for testing
+ * Uses SIFT detector with LP-SIFT's custom 64-dim descriptor
+ * This isolates whether speedup comes from detector or descriptor
+ */
+class SIFTWithLPDescriptor final : public cv::Feature2D {
+public:
+    static cv::Ptr<SIFTWithLPDescriptor> create();
+
+    SIFTWithLPDescriptor();
+
+    cv::String getDefaultName() const override;
+
+    int descriptorSize() const override { return LPSIFT::DESCRIPTOR_SIZE; }
+    int descriptorType() const override { return CV_32F; }
+
+    void detect(cv::InputArray image,
+                std::vector<cv::KeyPoint>& keypoints,
+                cv::InputArray mask) override;
+
+    void compute(cv::InputArray image,
+                 std::vector<cv::KeyPoint>& keypoints,
+                 cv::OutputArray descriptors) override;
+
+    void detectAndCompute(cv::InputArray image,
+                          cv::InputArray mask,
+                          std::vector<cv::KeyPoint>& keypoints,
+                          cv::OutputArray descriptors,
+                          bool useProvidedKeypoints) override;
+
+private:
+    cv::Ptr<cv::SIFT> siftDetector_;
+
+    // Reuse LP-SIFT descriptor computation
+    void computeDescriptor(const cv::Mat& gray,
+                          const cv::KeyPoint& kpt,
+                          float* descriptor) const;
+};
+
 #endif //LPSIFT_H
