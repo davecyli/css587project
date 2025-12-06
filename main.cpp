@@ -85,8 +85,69 @@ void limitKeypoints(vector<KeyPoint>& kpts, int maxCount) {
 	}
 }
 
+std::vector<std::string> splitString(const std::string& s, char delimiter) {
+	std::vector<std::string> tokens;
+	std::string token;
+	std::istringstream tokenStream(s); // Create a stringstream from the input string
+
+	// Read tokens from the stringstream until the delimiter is found
+	while (std::getline(tokenStream, token, delimiter)) {
+		tokens.push_back(token); // Add each token to the vector
+	}
+	return tokens;
+}
+
+void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, map<string, BenchmarkRunner::DetectorFilter>& filteredDetectors) {
+	
+	int squareBracketStart = imageSetIdArg.find("[");
+
+	if (squareBracketStart != string::npos) {
+		int squareBracketEnd = imageSetIdArg.find("]");
+
+		if (squareBracketEnd != imageSetIdArg.length() - 1) {
+			throw new invalid_argument("Invalid descriptor filter syntax");
+		}
+
+		if (squareBracketEnd - squareBracketStart <= 1) {
+			throw new invalid_argument("Empty descriptor filter");
+		}
+
+		string detectorsCommaDelimited = imageSetIdArg.substr(squareBracketStart + 1, squareBracketEnd - squareBracketStart - 1);
+
+		vector<string> detectorTokens = splitString(detectorsCommaDelimited, ',');
+
+		BenchmarkRunner::DetectorFilter filter = { false, false, false, false, false, false };
+
+		for (const string& token : detectorTokens) {
+			if (token == "SIFT") filter.SIFT = true;
+			else if (token == "ORB") filter.ORB = true;
+			else if (token == "BRISK") filter.BRISK = true;
+			else if (token == "SURF") filter.SURF = true;
+			else if (token == "SIFTLP") filter.SIFTLP = true;
+			else if (token == "LPSIFT") filter.LPSIFT = true;
+			else {
+				throw new invalid_argument("Unknown detector in filter: " + token);
+			}
+		}
+
+		cout << "SIFT : " << filter.SIFT << ", ORB: " << filter.ORB << ", BRISK: " << filter.BRISK
+			<< ", SURF: " << filter.SURF << ", SIFTLP: " << filter.SIFTLP << ", LPSIFT: " << filter.LPSIFT << endl;
+
+		string imageSetId = imageSetIdArg.substr(0, squareBracketStart);
+
+		if(imageSetId.length()>0)
+			filteredImageSetIds.insert(imageSetId);
+
+		filteredDetectors[imageSetId] = filter;
+	}
+	else {
+		filteredImageSetIds.insert(imageSetIdArg);
+	}
+
+}
+
 // Run benchmark mode
-int runBenchmark(const set<string>& filteredImageSets) {
+int runBenchmark(const set<string>& filteredImageSets, const map<string,BenchmarkRunner::DetectorFilter>& filteredDetectors) {
 	cout << "=================================================\n"
 		<< "CSS 587 LP-SIFT Benchmarking Framework\n"
 		<< "=================================================\n\n";
@@ -106,7 +167,7 @@ int runBenchmark(const set<string>& filteredImageSets) {
 	fs::create_directories(outputDir);
 
 	// Run benchmarks on all image sets
-	auto results = runner.runOnDirectory(IMAGE_DIR, filteredImageSets, outputDir);
+	auto results = runner.runOnDirectory(IMAGE_DIR, filteredImageSets, filteredDetectors, outputDir);
 
 	if (results.empty()) {
 		cerr << "No benchmark results collected. Check if images exist in " << IMAGE_DIR << endl;
@@ -169,7 +230,9 @@ int main(int argc, char* argv[]) {
 
 	// Parse command line arguments
 	string outputFile = DEFAULT_OUTPUT_CSV;
+
 	set<string> filteredImageIds;
+	map<string, BenchmarkRunner::DetectorFilter> filteredDetectors;
 
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
@@ -180,7 +243,7 @@ int main(int argc, char* argv[]) {
 		}
 		else if (arg[0] != '-') {
 			// Assume it's an image set filter
-			filteredImageIds.insert(arg);
+			parseImageSetIdArg(arg, filteredImageIds, filteredDetectors);
 		}
 		else {
 			cerr << "Unknown option: " << arg << endl;
@@ -190,7 +253,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	try {
-		return runBenchmark(filteredImageIds);
+		return runBenchmark(filteredImageIds, filteredDetectors);
 	}
 	catch (const exception& e) {
 		cerr << "Error: " << e.what() << endl;

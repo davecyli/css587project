@@ -17,6 +17,7 @@
 #include <iomanip>
 #include <filesystem>
 #include <set>
+#include <map>
 
 #include <opencv2/core.hpp>
 #include <opencv2/features2d.hpp>
@@ -126,6 +127,9 @@ struct StitchingMetrics {
     double warpingTime = 0.0;
     double totalStitchingTime = 0.0;
 
+    cv::Mat homography;  // Estimated homography matrix
+    cv::Mat baselineH;
+
     // LP-SIFT specific parameters
     std::string windowSizes;
 
@@ -149,6 +153,31 @@ struct StitchingMetrics {
     static std::string formatTime(double seconds) {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(2) << seconds;
+        return oss.str();
+    }
+
+    static std::string printHomography(const cv::Mat& H) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(4);
+
+        oss << "[";
+
+        for (int i = 0; i < H.rows; i++) {
+            oss << "[";
+
+            for (int j = 0; j < H.cols; j++) {
+                oss << H.at<double>(i, j);
+                if (j < H.cols - 1)
+                    oss << ", ";
+            }
+
+            oss << "]";
+            if (i < H.rows - 1)
+                oss << ", ";
+        }
+
+        oss << "]";
+
         return oss.str();
     }
 };
@@ -212,6 +241,17 @@ public:
         MatcherType matcherType = MatcherType::FLANN;  // Default to FLANN for no keypoint limit
     };
 
+    struct DetectorFilter {
+        bool SIFT;
+        bool ORB;
+        bool BRISK;
+        bool SURF;
+        bool SIFTLP;
+        bool LPSIFT;
+    };
+
+    cv::Mat baselineH;
+
     BenchmarkRunner() = default;
 
     // Add a detector to benchmark
@@ -237,12 +277,14 @@ public:
         const cv::Mat& referenceImg,
         const cv::Mat& registeredImg,
 		const vector<int>& lpsiftWindowSizes,
-        const std::string& outputPath);
+        const std::string& outputPath
+        );
 
     // Run benchmark on all image sets in a directory
     std::vector<StitchingMetrics> runOnDirectory(
         const string& imageDir,
         const set<string>& filteredImageSets,
+		const map<string, DetectorFilter>& filteredDetectors,
         const string& outputPath);
 
     // Print summary table (similar to paper's Table 2)
