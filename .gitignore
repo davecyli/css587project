@@ -58,5 +58,5 @@ build/
 out/
 
 # Benchmark output
-results.csv
+results*.csv
 benchmark_output/

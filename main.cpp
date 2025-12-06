@@ -179,7 +179,6 @@ int runBenchmark(const set<string>& filteredImageSets, const map<string,Benchmar
 	// Export to CSV
 	CSVExporter exporter(outputFile);
 	exporter.writeAllMetrics(results);
-	cout << "\nResults saved to: " << outputFile << endl;
 
 	// Print summary table
 	BenchmarkRunner::printSummaryTable(results);

@@ -140,11 +140,29 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
     file.close();
 }
 
+void findAvailableFileName(std::string baseName, std::string extension, std::string& ref) {
+    int counter = 1;
+    std::string testName = baseName + extension;
+    std::ifstream file(testName);
+    while (file.good()) {
+        file.close();
+        testName = baseName + "_" + std::to_string(counter) + extension;
+        file.open(testName);
+        counter++;
+    }
+    ref = testName;
+}
+
 void CSVExporter::writeAllMetrics(const std::vector<StitchingMetrics>& metrics) {
+
+    findAvailableFileName("results", ".csv", filename_);
+
     writeHeader();
     for (const auto& m : metrics) {
         writeMetrics(m);
     }
+
+    cout << "\nResults saved to: " << filename_ << endl;
 }
 
 // ============================================================================
@@ -495,7 +513,19 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
 
             DetectorFilter detectorFilterProfile{};
 
+            if (globalFilters){
+                detectorFilterProfile = filteredDetectors.at("");
+			}
+
             if (!allFilters) {
+
+                DetectorFilter sourceProfile = filteredDetectors.at(setName);
+
+				detectorFilterProfile.SIFT = detectorFilterProfile.SIFT || sourceProfile.SIFT;
+				detectorFilterProfile.ORB = detectorFilterProfile.ORB || sourceProfile.ORB;
+				detectorFilterProfile.BRISK = detectorFilterProfile.BRISK || sourceProfile.BRISK;
+				detectorFilterProfile.SURF = detectorFilterProfile.SURF || sourceProfile.SURF;
+				detectorFilterProfile.LPSIFT = detectorFilterProfile.LPSIFT || sourceProfile.LPSIFT;
 
             }
 
@@ -503,10 +533,17 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
                 allFilters = false;
             }
 
-            addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
-            addDetector("ORB", ORB::create(250000), NORM_HAMMING);
-            addDetector("BRISK", BRISK::create(), NORM_HAMMING);
-            addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+			if (allFilters || detectorFilterProfile.SIFT)
+                addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
+            
+			if (allFilters || detectorFilterProfile.ORB)
+                addDetector("ORB", ORB::create(250000), NORM_HAMMING);
+            
+			if (allFilters || detectorFilterProfile.BRISK)
+                addDetector("BRISK", BRISK::create(), NORM_HAMMING);
+            
+			if (allFilters || detectorFilterProfile.SURF)
+                addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
 
             std::vector<int> windowSizes = getWindowSize(reference.cols, reference.rows);
 
