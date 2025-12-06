@@ -100,11 +100,9 @@ void LPSIFT::detect(InputArray image,
 
     for (size_t idx = 0; idx < windowSizes_.size(); ++idx) {
         const int L = windowSizes_[idx];
-        for (int y = 0; y < rows; y += L) {
-            const int h = std::min(L, rows - y);
-            for (int x = 0; x < cols; x += L) {
-                const int w = std::min(L, cols - x);
-                Rect roi(x, y, w, h);
+        for (int y = 0; y + L <= rows; y += L) {
+            for (int x = 0; x + L <= cols; x += L) {
+                Rect roi(x, y, L, L);
 
                 Mat tile = gray(roi);
                 double minVal = 0.0, maxVal = 0.0;
