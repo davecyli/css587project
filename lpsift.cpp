@@ -45,23 +45,23 @@ void LPSIFT::addLinearRamp(Mat& image) const {
 
     // Pre-compute ramp and add to image
     Mat ramp(image.rows, image.cols, CV_32F);
-    float* data = ramp.ptr<float>();
+    auto* data = ramp.ptr<float>();
     std::iota(data, data + ramp.total(), 0.0f); // 0,1,2,... in raster order
     ramp *= linearNoiseAlpha_;
     image += ramp;
 }
 
-bool LPSIFT::addKeypointCandidate(int x,
-                                  int y,
-                                  int windowSize,
-                                  int octaveIndex,
-                                  float response,
-                                  int cols,
-                                  int rows,
-                                  std::vector<KeyPoint>& out) const {
+bool LPSIFT::addKeypointCandidate(const int x,
+                                  const int y,
+                                  const int windowSize,
+                                  const int octaveIndex,
+                                  const float response,
+                                  const int cols,
+                                  const int rows,
+                                  std::vector<KeyPoint>& out) {
     if (x < 0 || y < 0 || x >= cols || y >= rows || windowSize <= 0) return false;
 
-    const float size = static_cast<float>(windowSize);
+    const auto size = static_cast<float>(windowSize);
     KeyPoint kp(Point2f(static_cast<float>(x), static_cast<float>(y)), size);
     kp.response = response;
     kp.angle = -1.0f; // let SIFT assign orientation during compute()
@@ -114,7 +114,7 @@ void LPSIFT::detect(InputArray image,
                 const int gyMax = y + maxLoc.y;
                 const int gxMin = x + minLoc.x;
                 const int gyMin = y + minLoc.y;
-                const float response = static_cast<float>(maxVal - minVal);
+                const auto response = static_cast<float>(maxVal - minVal);
 
                 addKeypointCandidate(gxMax, gyMax, L, static_cast<int>(idx), response, cols, rows, keypoints);
                 addKeypointCandidate(gxMin, gyMin, L, static_cast<int>(idx), response, cols, rows, keypoints);
@@ -137,7 +137,7 @@ void LPSIFT::compute(InputArray image,
         return;
     }
 
-    Mat src = image.getMat();
+    const Mat src = image.getMat();
     if (src.empty() || descriptor_.empty()) {
         descriptors.release();
         return;
