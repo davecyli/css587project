@@ -63,6 +63,8 @@ void CSVExporter::writeHeader() {
          << "Homography Time (s),"
          << "Warping Time (s),"
          << "Total Stitching Time (s),"
+         << "Homography Matrix,"
+         << "Homography Difference from SIFT,"
          << "Success,"
          << "Failure Reason"
          << "\n";
@@ -127,6 +129,8 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
         StitchingMetrics::formatTime(m.homographyTime),
         StitchingMetrics::formatTime(m.warpingTime),
         StitchingMetrics::formatTime(m.totalStitchingTime),
+        m.printHomography(m.homography),
+        m.printHomography(m.homography - m.baselineH),
         (m.stitchingSuccess ? "Yes" : "No"),
         m.failureReason
     );
@@ -376,6 +380,14 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         metrics.totalStitchingTime = totalTimer.elapsedSeconds();
         metrics.stitchingSuccess = true;
 
+        metrics.homography = cv::Mat(H);
+
+        if (config.name == "SIFT") {
+            this->baselineH = cv::Mat(H);
+        }
+
+        metrics.baselineH = this->baselineH;
+
         // Save stitched image if requested
         if (!outputPath.empty()) {
             std::string outFile = outputPath + "/" + datasetName + "_" + config.name + "_stitched.jpg";
@@ -509,6 +521,7 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
               << std::setw(10) << "Inliers"
               << std::setw(12) << "Window(L)"
               << std::setw(12) << "Time(s)"
+              << std::setw(48) << "Homography Difference"
               << std::endl;
     std::cout << std::string(120, '-') << std::endl;
 
@@ -524,6 +537,7 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
                   << std::setw(10) << (m.stitchingSuccess ? std::to_string(m.numInliers) : "x")
                   << std::setw(12) << m.windowSizes
                   << std::setw(12) << (m.stitchingSuccess ? StitchingMetrics::formatTime(m.totalStitchingTime) : "Failed")
+                  << std::setw(48) << m.printHomography(m.homography - m.baselineH)
                   << std::endl;
     }
 

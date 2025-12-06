@@ -126,6 +126,9 @@ struct StitchingMetrics {
     double warpingTime = 0.0;
     double totalStitchingTime = 0.0;
 
+    cv::Mat homography;  // Estimated homography matrix
+    cv::Mat baselineH;
+
     // LP-SIFT specific parameters
     std::string windowSizes;
 
@@ -149,6 +152,31 @@ struct StitchingMetrics {
     static std::string formatTime(double seconds) {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(2) << seconds;
+        return oss.str();
+    }
+
+    static std::string printHomography(const cv::Mat& H) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(4);
+
+        oss << "[";
+
+        for (int i = 0; i < H.rows; i++) {
+            oss << "[";
+
+            for (int j = 0; j < H.cols; j++) {
+                oss << H.at<double>(i, j);
+                if (j < H.cols - 1)
+                    oss << ", ";
+            }
+
+            oss << "]";
+            if (i < H.rows - 1)
+                oss << ", ";
+        }
+
+        oss << "]";
+
         return oss.str();
     }
 };
@@ -211,6 +239,8 @@ public:
         cv::NormTypes matcherNorm;
         MatcherType matcherType = MatcherType::FLANN;  // Default to FLANN for no keypoint limit
     };
+
+    cv::Mat baselineH;
 
     BenchmarkRunner() = default;
 
