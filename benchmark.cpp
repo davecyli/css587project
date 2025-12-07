@@ -67,9 +67,6 @@ void CSVExporter::writeHeader() {
          << "Homography Difference from SIFT,"
          << "Homography L2 Norm,"
          << "Success,"
-         << "Homography Matrix,"
-         << "Homography Difference from SIFT,"
-         << "Homography L2 Norm,"
          << "Failure Reason"
          << "\n";
 
