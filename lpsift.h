@@ -9,7 +9,7 @@ using namespace cv;
 class LPSIFT final : public Feature2D {
 public:
     static Ptr<LPSIFT> create(
-        const std::vector<int>& windowSizes = {16, 40, 128},
+        const std::vector<int>& windowSizes = { 16, 32, 64, 128, 256 },
         float linearNoiseAlpha = 1e-6f);
 
     // Public to allow cv::makePtr; defaults are defined only on create().

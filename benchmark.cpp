@@ -549,9 +549,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
             std::cout << "  Using window sizes L = " << joinInts(windowSizes) << std::endl;
 
             if (allFilters || detectorFilterProfile.LPSIFT)
-                addDetector("LP-SIFT", LPSIFT::create(
-                    windowSizes
-                ), NORM_L2);
+                addDetector("LP-SIFT", LPSIFT::create(windowSizes), NORM_L2);
 
             auto results = runAllDetectors(setName, reference, registered,
                 windowSizes, outputPath);
