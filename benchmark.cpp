@@ -66,6 +66,7 @@ void CSVExporter::writeHeader() {
          << "Success,"
          << "Homography Matrix,"
          << "Homography Difference from SIFT,"
+         << "Homography L2 Norm,"
          << "Failure Reason"
          << "\n";
 
@@ -131,6 +132,7 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
         StitchingMetrics::formatTime(m.totalStitchingTime),
         m.printHomography(m.homography),
         m.printHomography(m.homography - m.baselineH),
+		cv::norm(m.homography - m.baselineH, cv::NORM_L2),
         (m.stitchingSuccess ? "Yes" : "No"),
         m.failureReason
     );
@@ -279,12 +281,12 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
 
         // Limit keypoints only for BFMatcher (has ~65536 limit due to IMGIDX_ONE)
         // FLANN can handle unlimited keypoints
-        /*if (config.matcherType == MatcherType::BRUTE_FORCE) {
+        if (config.matcherType == MatcherType::BRUTE_FORCE) {
             limitKeypoints(kpts1, MAX_KEYPOINTS_BF);
             limitKeypoints(kpts2, MAX_KEYPOINTS_BF);
             metrics.numKeypointsReference = static_cast<int>(kpts1.size());
             metrics.numKeypointsRegistered = static_cast<int>(kpts2.size());
-        }*/
+        }
 
         // Descriptor computation - Reference image
         stepTimer.start();
@@ -315,50 +317,48 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         stepTimer.start();
         std::vector<cv::DMatch> matches;
 
-        //if (config.matcherType == MatcherType::FLANN) {
-        //    // FLANN matcher - can handle unlimited keypoints
-        //    cv::Ptr<cv::DescriptorMatcher> matcher;
+        if (config.matcherType == MatcherType::FLANN) {
+            // FLANN matcher - can handle unlimited keypoints
+            cv::Ptr<cv::DescriptorMatcher> matcher;
 
-        //    if (config.matcherNorm == cv::NORM_HAMMING || config.matcherNorm == cv::NORM_HAMMING2) {
-        //        // Binary descriptors (ORB, BRISK) - use LSH index
-        //        cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2);
-        //        cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
-        //        matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
-        //    } else {
-        //        // Float descriptors (SIFT) - use KDTree index
-        //        cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::KDTreeIndexParams>(5);
-        //        cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
-        //        matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
-        //    }
+            if (config.matcherNorm == cv::NORM_HAMMING || config.matcherNorm == cv::NORM_HAMMING2) {
+                // Binary descriptors (ORB, BRISK) - use LSH index
+                cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2);
+                cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+                matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
+            } else {
+                // Float descriptors (SIFT) - use KDTree index
+                cv::Ptr<cv::flann::IndexParams> indexParams = cv::makePtr<cv::flann::KDTreeIndexParams>(5);
+                cv::Ptr<cv::flann::SearchParams> searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+                matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
+            }
 
-        //    // Use knnMatch with ratio test for better quality matches
-        //    std::vector<std::vector<cv::DMatch>> knnMatches;
-        //    matcher->knnMatch(desc1, desc2, knnMatches, 2);
+            // Use knnMatch with ratio test for better quality matches
+            std::vector<std::vector<cv::DMatch>> knnMatches;
+            matcher->knnMatch(desc1, desc2, knnMatches, 2);
 
-        //    // Apply Lowe's ratio test
-        //    const float ratioThresh = 0.75f;
-        //    for (const auto& knn : knnMatches) {
-        //        if (knn.size() >= 2 && knn[0].distance < ratioThresh * knn[1].distance) {
-        //            matches.push_back(knn[0]);
-        //        }
-        //    }
-        //} else {
-        //    // BFMatcher - exact matching but limited to ~65k keypoints
-        //    
-        //}
-
-        cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(config.matcherNorm);
-
-        try {
-            matcher->match(desc1, desc2, matches);
-		}
-		catch (exception& e) {
-            metrics.stitchingSuccess = false;
-            metrics.failureReason = std::string("Over size");
-            totalTimer.stop();
-            metrics.totalStitchingTime = totalTimer.elapsedSeconds();
-            return metrics;
+            // Apply Lowe's ratio test
+            const float ratioThresh = 0.75f;
+            for (const auto& knn : knnMatches) {
+                if (knn.size() >= 2 && knn[0].distance < ratioThresh * knn[1].distance) {
+                    matches.push_back(knn[0]);
+                }
+            }
+        } else {
+            // BFMatcher - exact matching but limited to ~65k keypoints
+            cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(config.matcherNorm);
+            try {
+                matcher->match(desc1, desc2, matches);
+            }
+            catch (exception& e) {
+                metrics.stitchingSuccess = false;
+                metrics.failureReason = std::string("Over size");
+                totalTimer.stop();
+                metrics.totalStitchingTime = totalTimer.elapsedSeconds();
+                return metrics;
+            }
         }
+        
         stepTimer.stop();
         metrics.matchingTime = stepTimer.elapsedSeconds();
         metrics.numMatches = static_cast<int>(matches.size());
@@ -533,8 +533,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
                 allFilters = false;
             }
 
-			if (allFilters || detectorFilterProfile.SIFT)
-                addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
+			addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2); // SIFT always has to run regardless of filters
             
 			if (allFilters || detectorFilterProfile.ORB)
                 addDetector("ORB", ORB::create(250000), NORM_HAMMING);
@@ -580,9 +579,9 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
               << std::setw(12) << "Keypts Reg"
               << std::setw(10) << "Matches"
               << std::setw(10) << "Inliers"
-              << std::setw(12) << "Window(L)"
+              << std::setw(24) << "Window(L)"
               << std::setw(12) << "Time(s)"
-              << std::setw(48) << "Homography Difference"
+              << std::setw(48) << "Homography L2 Norm from SIFT"
               << std::endl;
     std::cout << std::string(120, '-') << std::endl;
 
@@ -596,9 +595,9 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
                   << std::setw(12) << (m.stitchingSuccess ? std::to_string(m.numKeypointsRegistered) : "x")
                   << std::setw(10) << (m.stitchingSuccess ? std::to_string(m.numMatches) : "x")
                   << std::setw(10) << (m.stitchingSuccess ? std::to_string(m.numInliers) : "x")
-                  << std::setw(12) << m.windowSizes
+                  << std::setw(24) << m.windowSizes
                   << std::setw(12) << (m.stitchingSuccess ? StitchingMetrics::formatTime(m.totalStitchingTime) : "Failed")
-                  << std::setw(48) << m.printHomography(m.homography - m.baselineH)
+                  << std::setw(48) << cv::norm(m.homography - m.baselineH, cv::NORM_L2)
                   << std::endl;
     }
 
