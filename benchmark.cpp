@@ -64,6 +64,9 @@ void CSVExporter::writeHeader() {
          << "Warping Time (s),"
          << "Total Stitching Time (s),"
          << "Success,"
+         << "Homography Matrix,"
+         << "Homography Difference from SIFT,"
+         << "Homography L2 Norm,"
          << "Failure Reason"
          << "\n";
 
@@ -127,6 +130,9 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
         StitchingMetrics::formatTime(m.homographyTime),
         StitchingMetrics::formatTime(m.warpingTime),
         StitchingMetrics::formatTime(m.totalStitchingTime),
+        m.printHomography(m.homography),
+        m.printHomography(m.homography - m.baselineH),
+		cv::norm(m.homography - m.baselineH, cv::NORM_L2),
         (m.stitchingSuccess ? "Yes" : "No"),
         m.failureReason
     );
@@ -136,11 +142,29 @@ void CSVExporter::writeMetrics(const StitchingMetrics& m) {
     file.close();
 }
 
+void findAvailableFileName(std::string baseName, std::string extension, std::string& ref) {
+    int counter = 1;
+    std::string testName = baseName + extension;
+    std::ifstream file(testName);
+    while (file.good()) {
+        file.close();
+        testName = baseName + "_" + std::to_string(counter) + extension;
+        file.open(testName);
+        counter++;
+    }
+    ref = testName;
+}
+
 void CSVExporter::writeAllMetrics(const std::vector<StitchingMetrics>& metrics) {
+
+    findAvailableFileName("results", ".csv", filename_);
+
     writeHeader();
     for (const auto& m : metrics) {
         writeMetrics(m);
     }
+
+    cout << "\nResults saved to: " << filename_ << endl;
 }
 
 // ============================================================================
@@ -323,9 +347,18 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         } else {
             // BFMatcher - exact matching but limited to ~65k keypoints
             cv::Ptr<cv::BFMatcher> matcher = cv::BFMatcher::create(config.matcherNorm);
-            matcher->match(desc1, desc2, matches);
+            try {
+                matcher->match(desc1, desc2, matches);
+            }
+            catch (exception& e) {
+                metrics.stitchingSuccess = false;
+                metrics.failureReason = std::string("Over size");
+                totalTimer.stop();
+                metrics.totalStitchingTime = totalTimer.elapsedSeconds();
+                return metrics;
+            }
         }
-
+        
         stepTimer.stop();
         metrics.matchingTime = stepTimer.elapsedSeconds();
         metrics.numMatches = static_cast<int>(matches.size());
@@ -375,6 +408,14 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
         totalTimer.stop();
         metrics.totalStitchingTime = totalTimer.elapsedSeconds();
         metrics.stitchingSuccess = true;
+
+        metrics.homography = cv::Mat(H);
+
+        if (config.name == "SIFT") {
+            this->baselineH = cv::Mat(H);
+        }
+
+        metrics.baselineH = this->baselineH;
 
         // Save stitched image if requested
         if (!outputPath.empty()) {
@@ -426,6 +467,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runAllDetectors(
 std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
     const string& imageDir,
 	const set<string>& filteredImageSets,
+	const map<string, DetectorFilter>& filteredDetectors,
     const string& outputPath
 ) {
     std::vector<StitchingMetrics> allResults;
@@ -465,19 +507,51 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
 
             clearDetectors(); // Clear previous detectors if any
 
-            addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2);
-            addDetector("ORB", ORB::create(250000), NORM_HAMMING);
-            addDetector("BRISK", BRISK::create(), NORM_HAMMING);
-            // SURF is patented and disabled in standard OpenCV builds
-            // addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
+            bool globalFilters = filteredDetectors.count("") > 0;
+
+			bool allFilters = filteredDetectors.count(setName) == 0;
+
+            DetectorFilter detectorFilterProfile{};
+
+            if (globalFilters){
+                detectorFilterProfile = filteredDetectors.at("");
+			}
+
+            if (!allFilters) {
+
+                DetectorFilter sourceProfile = filteredDetectors.at(setName);
+
+				detectorFilterProfile.SIFT = detectorFilterProfile.SIFT || sourceProfile.SIFT;
+				detectorFilterProfile.ORB = detectorFilterProfile.ORB || sourceProfile.ORB;
+				detectorFilterProfile.BRISK = detectorFilterProfile.BRISK || sourceProfile.BRISK;
+				detectorFilterProfile.SURF = detectorFilterProfile.SURF || sourceProfile.SURF;
+				detectorFilterProfile.LPSIFT = detectorFilterProfile.LPSIFT || sourceProfile.LPSIFT;
+
+            }
+
+            if (globalFilters) {
+                allFilters = false;
+            }
+
+			addDetector("SIFT", cv::SIFT::create(), cv::NORM_L2); // SIFT always has to run regardless of filters
+            
+			if (allFilters || detectorFilterProfile.ORB)
+                addDetector("ORB", ORB::create(250000), NORM_HAMMING);
+            
+			if (allFilters || detectorFilterProfile.BRISK)
+                addDetector("BRISK", BRISK::create(), NORM_HAMMING);
+            
+			if (allFilters || detectorFilterProfile.SURF)
+                addDetector("SURF", xfeatures2d::SURF::create(), NORM_L2);
 
             std::vector<int> windowSizes = getWindowSize(reference.cols, reference.rows);
 
             std::cout << "  Using window sizes L = " << joinInts(windowSizes) << std::endl;
 
-            addDetector("LP-SIFT", LPSIFT::create(
-                windowSizes
-            ), NORM_L2);
+            if (allFilters || detectorFilterProfile.LPSIFT)
+                addDetector("LP-SIFT", LPSIFT::create(
+                    windowSizes
+                ), NORM_L2);
 
             auto results = runAllDetectors(setName, reference, registered,
                 windowSizes, outputPath);
@@ -505,8 +579,9 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
               << std::setw(12) << "Keypts Reg"
               << std::setw(10) << "Matches"
               << std::setw(10) << "Inliers"
-              << std::setw(12) << "Window(L)"
+              << std::setw(24) << "Window(L)"
               << std::setw(12) << "Time(s)"
+              << std::setw(48) << "Homography L2 Norm from SIFT"
               << std::endl;
     std::cout << std::string(120, '-') << std::endl;
 
@@ -520,8 +595,9 @@ void BenchmarkRunner::printSummaryTable(const std::vector<StitchingMetrics>& res
                   << std::setw(12) << (m.stitchingSuccess ? std::to_string(m.numKeypointsRegistered) : "x")
                   << std::setw(10) << (m.stitchingSuccess ? std::to_string(m.numMatches) : "x")
                   << std::setw(10) << (m.stitchingSuccess ? std::to_string(m.numInliers) : "x")
-                  << std::setw(12) << m.windowSizes
+                  << std::setw(24) << m.windowSizes
                   << std::setw(12) << (m.stitchingSuccess ? StitchingMetrics::formatTime(m.totalStitchingTime) : "Failed")
+                  << std::setw(48) << cv::norm(m.homography - m.baselineH, cv::NORM_L2)
                   << std::endl;
     }
 
