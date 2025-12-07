@@ -249,6 +249,7 @@ public:
         bool SURF;
         bool SIFTLP;
         bool LPSIFT;
+        bool LPORB;
     };
 
     cv::Mat baselineH;

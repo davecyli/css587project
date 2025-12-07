@@ -1,19 +1,19 @@
-#ifndef LPSIFT_H
-#define LPSIFT_H
+#ifndef LPORB_H
+#define LPORB_H
 
 #include <opencv2/features2d.hpp>
 #include <vector>
 
 using namespace cv;
 
-class LPSIFT final : public Feature2D {
+class LPORB final : public Feature2D {
 public:
-    static Ptr<LPSIFT> create(
+    static Ptr<LPORB> create(
         const std::vector<int>& windowSizes = { 16, 32, 64, 128, 256 },
         float linearNoiseAlpha = 1e-6f);
 
     // Public to allow cv::makePtr; defaults are defined only on create().
-    explicit LPSIFT(const std::vector<int>& windowSizes,
+    explicit LPORB(const std::vector<int>& windowSizes,
                     float linearNoiseAlpha);
 
     String getDefaultName() const override; // NOLINT(modernize-use-nodiscard) matching OpenCV base signature
@@ -36,7 +36,7 @@ public:
                          bool useProvidedKeypoints) override;
 
 private:
-    Ptr<Feature2D> descriptor_; // SIFT descriptor implementation
+    Ptr<Feature2D> descriptor_; // Descriptor implementation (ORB-backed)
     std::vector<int> windowSizes_;
     float linearNoiseAlpha_;
 
@@ -52,4 +52,4 @@ private:
                               std::vector<KeyPoint>& out) ;
 };
 
-#endif //LPSIFT_H
+#endif //LPORB_H

@@ -18,6 +18,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include "lpsift.h"
+#include "lporb.h"
 
 using namespace cv;
 using namespace std;
@@ -231,7 +232,7 @@ StitchingMetrics BenchmarkRunner::runSingleBenchmark(
     metrics.algorithmName = config.name;
 
     // Only set window sizes for LP-SIFT algorithm, use "x" for others
-    if (config.name == "LP-SIFT") {
+    if (config.name == "LP-SIFT" || config.name == "LP-ORB") {
         metrics.windowSizes = joinInts(lpsiftWindowSizes);
     } else {
         metrics.windowSizes = "x";
@@ -526,6 +527,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
 				detectorFilterProfile.BRISK = detectorFilterProfile.BRISK || sourceProfile.BRISK;
 				detectorFilterProfile.SURF = detectorFilterProfile.SURF || sourceProfile.SURF;
 				detectorFilterProfile.LPSIFT = detectorFilterProfile.LPSIFT || sourceProfile.LPSIFT;
+				detectorFilterProfile.LPORB = detectorFilterProfile.LPORB || sourceProfile.LPORB;
 
             }
 
@@ -549,9 +551,14 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
             std::cout << "  Using window sizes L = " << joinInts(windowSizes) << std::endl;
 
             if (allFilters || detectorFilterProfile.LPSIFT)
-            addDetector("LP-SIFT", LPSIFT::create(
-                windowSizes
-            ), NORM_HAMMING);
+                addDetector("LP-SIFT", LPSIFT::create(
+                    windowSizes
+                ), NORM_L2);
+
+            if (allFilters || detectorFilterProfile.LPORB)
+                addDetector("LP-ORB", LPORB::create(
+                    windowSizes
+                ), NORM_HAMMING);
 
             auto results = runAllDetectors(setName, reference, registered,
                 windowSizes, outputPath);

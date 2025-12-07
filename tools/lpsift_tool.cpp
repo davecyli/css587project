@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
     if (img1.empty() || img2.empty()) return 1;
 
     Ptr<LPSIFT> lpsift = LPSIFT::create(windowSizes, 1e-6f);
-    runAndShow(img1, img2, lpsift, NORM_HAMMING, "LP-SIFT", outPath, showOutput);
+    runAndShow(img1, img2, lpsift, NORM_L2, "LP-SIFT", outPath, showOutput);
 
     return 0;
 }

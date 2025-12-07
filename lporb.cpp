@@ -1,5 +1,5 @@
 /*
- * LP-SIFT implementation based on:
+ * LP-ORB implementation based on but with the ORB descriptor:
  * Hao Li et al., "Local-peak scale-invariant feature transform for fast and random image stitching"
  * (arXiv:2405.08578v2).
  *
@@ -7,10 +7,10 @@
  *  - Add a tiny linear background (alpha) to avoid flat regions with identical intensities.
  *  - Partition the image into interrogation windows of multiple sizes (L).
  *  - Collect both the local maximum and minimum within each window as keypoints (multi-scale peaks).
- *  - Use SIFT descriptors around those peak points.
+ *  - Use ORB descriptors around those peak points.
  */
 
-#include "lpsift.h"
+#include "lporb.h"
 
 #include <opencv2/features2d.hpp>
 #include <opencv2/imgproc.hpp>
@@ -21,26 +21,26 @@
 
 using namespace cv;
 
-Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
+Ptr<LPORB> LPORB::create(const std::vector<int>& windowSizes,
                            const float linearNoiseAlpha) {
-    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha);
+    return makePtr<LPORB>(windowSizes, linearNoiseAlpha);
 }
 
-LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
+LPORB::LPORB(const std::vector<int>& windowSizes,
                const float linearNoiseAlpha)
-    : descriptor_(SIFT::create()),
+    : descriptor_(ORB::create()),
       windowSizes_(windowSizes),
       linearNoiseAlpha_(linearNoiseAlpha) {}
 
-String LPSIFT::getDefaultName() const {
-    return "Feature2D.LPSIFT";
+String LPORB::getDefaultName() const {
+    return "Feature2D.LPORB";
 }
 
 // Step 1: Image Preprocessing
 // Adds alpha * (y * cols + x) to each pixel to break flat plateaus deterministically.
 // Based on 𝑀𝑛,𝑘(𝑖,𝑗)=𝑀𝑘(𝑖,𝑗)+[(𝑖−1)∗𝑛𝑐𝑘 +𝑗]∗𝛼 where 𝛼 ≪ 1 is the linearNoiseAlpha
 // Precondition: image.type() == CV_32F
-void LPSIFT::addLinearRamp(Mat& image) const {
+void LPORB::addLinearRamp(Mat& image) const {
     // Input checks
     if (linearNoiseAlpha_ <= 0.0f || image.empty()) return;
 
@@ -52,7 +52,7 @@ void LPSIFT::addLinearRamp(Mat& image) const {
     image += ramp;
 }
 
-bool LPSIFT::addKeypointCandidate(const int x,
+bool LPORB::addKeypointCandidate(const int x,
                                   const int y,
                                   const int windowSize,
                                   const int octaveIndex,
@@ -75,7 +75,7 @@ bool LPSIFT::addKeypointCandidate(const int x,
 // Step 2: Feature Point Detection
 // This function integrates addLinearRamp (Step 1) in the call.
 // Precondition: windowSizes_ is not empty and that the value is greater than 1
-void LPSIFT::detect(InputArray image,
+void LPORB::detect(InputArray image,
                     std::vector<KeyPoint>& keypoints,
                     InputArray mask) {
     CV_UNUSED(mask); // Mask input is kept for API compatibility. Not implemented.
@@ -130,7 +130,7 @@ void LPSIFT::detect(InputArray image,
     //           });
 }
 
-void LPSIFT::compute(InputArray image,
+void LPORB::compute(InputArray image,
                      std::vector<KeyPoint>& keypoints,
                      OutputArray descriptors) {
     if (keypoints.empty()) {
@@ -155,10 +155,11 @@ void LPSIFT::compute(InputArray image,
         gray.convertTo(gray, CV_8U);
     }
 
-    descriptor_->compute(gray, keypoints, descriptors); // Use SIFT descriptor implementation
+    // ORB descriptor on LP-ORB keypoints
+    descriptor_->compute(gray, keypoints, descriptors);
 }
 
-void LPSIFT::detectAndCompute(InputArray image,
+void LPORB::detectAndCompute(InputArray image,
                               InputArray mask,
                               std::vector<KeyPoint>& keypoints,
                               OutputArray descriptors,

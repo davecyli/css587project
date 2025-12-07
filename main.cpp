@@ -116,7 +116,7 @@ void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, 
 
 		vector<string> detectorTokens = splitString(detectorsCommaDelimited, ',');
 
-		BenchmarkRunner::DetectorFilter filter = { false, false, false, false, false, false };
+		BenchmarkRunner::DetectorFilter filter = { false, false, false, false, false, false, false };
 
 		for (const string& token : detectorTokens) {
 			if (token == "SIFT") filter.SIFT = true;
@@ -125,13 +125,14 @@ void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, 
 			else if (token == "SURF") filter.SURF = true;
 			else if (token == "SIFTLP") filter.SIFTLP = true;
 			else if (token == "LPSIFT") filter.LPSIFT = true;
+			else if (token == "LPORB") filter.LPORB = true;
 			else {
 				throw new invalid_argument("Unknown detector in filter: " + token);
 			}
 		}
 
 		cout << "SIFT : " << filter.SIFT << ", ORB: " << filter.ORB << ", BRISK: " << filter.BRISK
-			<< ", SURF: " << filter.SURF << ", SIFTLP: " << filter.SIFTLP << ", LPSIFT: " << filter.LPSIFT << endl;
+			<< ", SURF: " << filter.SURF << ", SIFTLP: " << filter.SIFTLP << ", LPSIFT: " << filter.LPSIFT << ", LPORB: " << filter.LPORB << endl;
 
 		string imageSetId = imageSetIdArg.substr(0, squareBracketStart);
 

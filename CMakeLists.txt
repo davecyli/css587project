@@ -12,6 +12,8 @@ add_executable(css587project
     main.cpp
     lpsift.cpp
     benchmark.cpp
+        lporb.cpp
+        lporb.h
 )
 
 target_include_directories(css587project PRIVATE ${OpenCV_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
