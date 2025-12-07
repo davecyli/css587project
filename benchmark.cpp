@@ -63,10 +63,10 @@ void CSVExporter::writeHeader() {
          << "Homography Time (s),"
          << "Warping Time (s),"
          << "Total Stitching Time (s),"
-         << "Success,"
          << "Homography Matrix,"
          << "Homography Difference from SIFT,"
          << "Homography L2 Norm,"
+         << "Success,"
          << "Failure Reason"
          << "\n";
 
