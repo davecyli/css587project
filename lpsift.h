@@ -36,7 +36,7 @@ public:
                          bool useProvidedKeypoints) override;
 
 private:
-    Ptr<Feature2D> descriptor_; // SIFT descriptor implementation
+    Ptr<Feature2D> descriptor_; // Descriptor implementation (ORB-backed)
     std::vector<int> windowSizes_;
     float linearNoiseAlpha_;
 

@@ -28,7 +28,7 @@ Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
 
 LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
                const float linearNoiseAlpha)
-    : descriptor_(SIFT::create()),
+    : descriptor_(ORB::create()),
       windowSizes_(windowSizes),
       linearNoiseAlpha_(linearNoiseAlpha) {}
 
@@ -155,7 +155,8 @@ void LPSIFT::compute(InputArray image,
         gray.convertTo(gray, CV_8U);
     }
 
-    descriptor_->compute(gray, keypoints, descriptors); // Use SIFT descriptor implementation
+    // ORB descriptor on LP-SIFT keypoints
+    descriptor_->compute(gray, keypoints, descriptors);
 }
 
 void LPSIFT::detectAndCompute(InputArray image,
