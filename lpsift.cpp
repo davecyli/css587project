@@ -21,16 +21,15 @@
 using namespace cv;
 
 Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
-    const float linearNoiseAlpha) {
+                           const float linearNoiseAlpha) {
     return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha);
 }
 
 LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
-    const float linearNoiseAlpha)
+               const float linearNoiseAlpha)
     : descriptor_(SIFT::create()),
-    windowSizes_(windowSizes),
-    linearNoiseAlpha_(linearNoiseAlpha) {
-}
+      windowSizes_(windowSizes),
+      linearNoiseAlpha_(linearNoiseAlpha) {}
 
 String LPSIFT::getDefaultName() const {
     return "Feature2D.LPSIFT";
@@ -53,13 +52,13 @@ void LPSIFT::addLinearRamp(Mat& image) const {
 }
 
 bool LPSIFT::addKeypointCandidate(int x,
-    int y,
-    int windowSize,
-    int octaveIndex,
-    float response,
-    int cols,
-    int rows,
-    std::vector<KeyPoint>& out) const {
+                                  int y,
+                                  int windowSize,
+                                  int octaveIndex,
+                                  float response,
+                                  int cols,
+                                  int rows,
+                                  std::vector<KeyPoint>& out) const {
     if (x < 0 || y < 0 || x >= cols || y >= rows || windowSize <= 0) return false;
 
     const float size = static_cast<float>(windowSize);
@@ -76,8 +75,8 @@ bool LPSIFT::addKeypointCandidate(int x,
 // This function integrates addLinearRamp (Step 1) in the call.
 // Precondition: windowSizes_ is not empty and that the value is greater than 1
 void LPSIFT::detect(InputArray image,
-    std::vector<KeyPoint>& keypoints,
-    InputArray mask) {
+                    std::vector<KeyPoint>& keypoints,
+                    InputArray mask) {
     (void)mask; // Mask input is kept for API compatibility. Not implemented.
     keypoints.clear();
 
@@ -89,8 +88,7 @@ void LPSIFT::detect(InputArray image,
     Mat gray;
     if (src.channels() > 1) {
         cvtColor(src, gray, COLOR_BGR2GRAY);
-    }
-    else {
+    } else {
         gray = src.clone();
     }
 
@@ -134,8 +132,8 @@ void LPSIFT::detect(InputArray image,
 }
 
 void LPSIFT::compute(InputArray image,
-    std::vector<KeyPoint>& keypoints,
-    OutputArray descriptors) {
+                     std::vector<KeyPoint>& keypoints,
+                     OutputArray descriptors) {
     if (keypoints.empty()) {
         descriptors.release();
         return;
@@ -150,8 +148,7 @@ void LPSIFT::compute(InputArray image,
     Mat gray;
     if (src.channels() > 1) {
         cvtColor(src, gray, COLOR_BGR2GRAY);
-    }
-    else {
+    } else {
         gray = src;
     }
 
@@ -163,10 +160,10 @@ void LPSIFT::compute(InputArray image,
 }
 
 void LPSIFT::detectAndCompute(InputArray image,
-    InputArray mask,
-    std::vector<KeyPoint>& keypoints,
-    OutputArray descriptors,
-    const bool useProvidedKeypoints) {
+                              InputArray mask,
+                              std::vector<KeyPoint>& keypoints,
+                              OutputArray descriptors,
+                              const bool useProvidedKeypoints) {
     if (!useProvidedKeypoints) {
         detect(image, keypoints, mask);
     }
