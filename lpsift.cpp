@@ -12,10 +12,11 @@
 
 #include "lpsift.h"
 
-#include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 
 using namespace cv;
@@ -77,7 +78,7 @@ bool LPSIFT::addKeypointCandidate(const int x,
 void LPSIFT::detect(InputArray image,
                     std::vector<KeyPoint>& keypoints,
                     InputArray mask) {
-    (void)mask; // Mask input is kept for API compatibility. Not implemented.
+    CV_UNUSED(mask); // Mask input is kept for API compatibility. Not implemented.
     keypoints.clear();
 
     // Early exit if image is empty
