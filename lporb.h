@@ -1,55 +1,113 @@
+/*
+* David Li, Ben Schipunov, Kris Yu
+ * CSS 587 - Final Project: LP-SIFT
+ *
+ * lporb.h
+ * LP-SIFT implementation based on:
+ * Hao Li et al., "Local-peak scale-invariant feature transform for fast and random image stitching"
+ * (arXiv:2405.08578v2).
+ *
+ * This is an experimental detector that uses ORB's descriptor to see if we can improve total stitching time
+ */
+
 #ifndef LPORB_H
 #define LPORB_H
 
 #include <opencv2/features2d.hpp>
 #include <vector>
 
-using namespace cv;
 
-class LPORB final : public Feature2D {
+class LPORB final : public cv::Feature2D {
 public:
-    static Ptr<LPORB> create(
-        const std::vector<int>& windowSizes = { 16, 32, 64, 128, 256 },
-        float linearNoiseAlpha = 1e-6f);
+    // Different window sizes to cover good range of potential feature sizes in images
+    static inline const std::vector<int> DEFAULT_WINDOW_SIZES = { 16, 32, 64, 128, 256 };
+    static constexpr float DEFAULT_LINEAR_NOISE_ALPHA = 1e-6f; // Sufficiently small noise constant
 
-    // Public to allow cv::makePtr; defaults are defined only on create().
+    /** @brief Factory for an LPORB detector/descriptor.
+     *  @param windowSizes Interrogation window sizes (non-empty, values > 1).
+     *  @param linearNoiseAlpha Small ramp magnitude added during preprocessing.
+     *  @return Pointer created via cv::makePtr.
+     */
+    static cv::Ptr<LPORB> create(
+        const std::vector<int>& windowSizes = DEFAULT_WINDOW_SIZES,
+        float linearNoiseAlpha = DEFAULT_LINEAR_NOISE_ALPHA);
+
+    /** @brief Construct an LPORB detector/descriptor.
+     *  Public to allow cv::makePtr; defaults are defined only on create().
+     *  @param windowSizes Interrogation window sizes (non-empty, values > 1).
+     *  @param linearNoiseAlpha Ramp magnitude applied during preprocessing.
+     */
     explicit LPORB(const std::vector<int>& windowSizes,
-                    float linearNoiseAlpha);
+                   float linearNoiseAlpha);
 
-    String getDefaultName() const override; // NOLINT(modernize-use-nodiscard) matching OpenCV base signature
-
+    /** @brief OpenCV registry name for this implementation. */
+    cv::String getDefaultName() const override; // NOLINT(modernize-use-nodiscard) matching OpenCV base signature
+    /** @brief Dimension of the descriptor (delegates to ORB). */
     [[nodiscard]] int descriptorSize() const override { return descriptor_->descriptorSize(); }
+    /** @brief OpenCV type of the descriptor matrix (delegates to ORB). */
     [[nodiscard]] int descriptorType() const override { return descriptor_->descriptorType(); }
 
-    void detect(InputArray image,
-                std::vector<KeyPoint>& keypoints,
-                InputArray mask) override;
+    /** @brief Detect keypoints via Local Peaks after linear ramp preprocessing.
+     *  @param image Input image.
+     *  @param keypoints Output vector of detected keypoints.
+     *  @param mask Mask input (ignored; kept for API compatibility).
+     */
+    void detect(cv::InputArray image,
+                std::vector<cv::KeyPoint>& keypoints,
+                cv::InputArray mask) override;
 
-    void compute(InputArray image,
-                 std::vector<KeyPoint>& keypoints,
-                 OutputArray descriptors) override;
+    /** @brief Compute ORB descriptors for provided keypoints.
+     *  @param image Input image.
+     *  @param keypoints Keypoints to describe (must be non-empty).
+     *  @param descriptors Output descriptor matrix.
+     */
+    void compute(cv::InputArray image,
+                 std::vector<cv::KeyPoint>& keypoints,
+                 cv::OutputArray descriptors) override;
 
-    void detectAndCompute(InputArray image,
-                          InputArray mask,
-                         std::vector<KeyPoint>& keypoints,
-                         OutputArray descriptors,
-                         bool useProvidedKeypoints) override;
+    /** @brief Combined detect and compute pipeline. Calls LPORB detect then ORB compute.
+     *  @param image Input image.
+     *  @param mask Optional mask (ignored).
+     *  @param keypoints Output keypoints (or input when useProvidedKeypoints is true).
+     *  @param descriptors Output descriptor matrix.
+     *  @param useProvidedKeypoints If false, runs detect() first; otherwise only computes descriptors.
+     */
+    void detectAndCompute(cv::InputArray image,
+                          cv::InputArray mask,
+                          std::vector<cv::KeyPoint>& keypoints,
+                          cv::OutputArray descriptors,
+                          bool useProvidedKeypoints) override;
 
 private:
-    Ptr<Feature2D> descriptor_; // Descriptor implementation (ORB-backed)
+    cv::Ptr<cv::Feature2D> descriptor_; // Descriptor implementation (ORB-backed)
     std::vector<int> windowSizes_;
     float linearNoiseAlpha_;
 
-    // Adds alpha * (y * cols + x) ramp to make pixel values strictly increasing; expects CV_32F input.
-    void addLinearRamp(Mat& image) const;
+    /** @brief Adds a linear ramp to the image
+     *
+     * Note: Uses formular alpha * (y * cols + x) ramp to make pixel values strictly increasing.
+     * @param image Input Image
+     */
+    void addLinearRamp(cv::Mat& image) const;
+    /** @brief Validate bounds and append a keypoint candidate.
+     *  @param x Pixel x coordinate.
+     *  @param y Pixel y coordinate.
+     *  @param windowSize Interrogation window size (pixels).
+     *  @param octaveIndex Index of the current scale/octave.
+     *  @param response Response/contrast value to store.
+     *  @param cols Image width (used for bounds check).
+     *  @param rows Image height (used for bounds check).
+     *  @param out Destination vector to receive the keypoint.
+     *  @return True if the keypoint was within bounds and added; false otherwise.
+     */
     static bool addKeypointCandidate(int x,
-                              int y,
-                              int windowSize,
-                              int octaveIndex,
-                              float response,
-                              int cols,
-                              int rows,
-                              std::vector<KeyPoint>& out) ;
+                                     int y,
+                                     int windowSize,
+                                     int octaveIndex,
+                                     float response,
+                                     int cols,
+                                     int rows,
+                                     std::vector<cv::KeyPoint>& out);
 };
 
 #endif //LPORB_H

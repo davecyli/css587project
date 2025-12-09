@@ -14,12 +14,12 @@
 #include <opencv2/features2d.hpp>
 #include <vector>
 
-// Good range of different window sizes to cover potential feature sizes in images
-const std::vector<int> DEFAULT_WINDOW_SIZES = { 16, 32, 64, 128, 256 };
-constexpr float DEFAULT_LINEAR_NOISE_ALPHA = 1e-6f; // Sufficiently small noise constant
 
 class LPSIFT final : public cv::Feature2D {
 public:
+    // Different window sizes to cover good range of potential feature sizes in images
+    static inline const std::vector<int> DEFAULT_WINDOW_SIZES = { 16, 32, 64, 128, 256 };
+    static constexpr float DEFAULT_LINEAR_NOISE_ALPHA = 1e-6f; // Sufficiently small noise constant
 
     /** @brief Factory for an LPSIFT detector/descriptor.
      *  @param windowSizes Interrogation window sizes (non-empty, values > 1).
