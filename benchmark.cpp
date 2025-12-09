@@ -554,9 +554,7 @@ std::vector<StitchingMetrics> BenchmarkRunner::runOnDirectory(
                 addDetector("LP-SIFT", LPSIFT::create(windowSizes), NORM_L2);
 
             if (allFilters || detectorFilterProfile.LPORB)
-                addDetector("LP-ORB", LPORB::create(
-                    windowSizes
-                ), NORM_HAMMING);
+                addDetector("LP-ORB", LPORB::create(windowSizes), NORM_HAMMING);
 
             auto results = runAllDetectors(setName, reference, registered,
                 windowSizes, outputPath);
