@@ -4,12 +4,44 @@ Authors: David Li, Ben Schipunov, Kris Yu
 # Summary
 This project looks to explore and re-implement LP-SIFT in C++ from this paper: https://arxiv.org/abs/2405.08578
 
-# OpenCV installation with xfeatures2d (needed for SURF)
+# Requirements
+- OpenCV 4.x
+   - Built with contrib modules and nonfree enabled (opencv_contrib) so xfeatures2d/SURF are available;
+   - Core modules used: core, imgproc, features2d, highgui (plus xfeatures2d).
+- CMake 3.16+
+- A C++17-capable compiler/toolchain
+- Standard build tools (make/ninja or MSVC solution)
 
-Assuming folder layout:
-
+# Quick start
+## Clone the repo
 ```
-C:/dev/opencv-4.x/               (OpenCV source)
+git clone https://github.com/davecyli/css587project.git
+```
+## Build
+```
+cmake --build cmake-build-debug
+```
+## Execute
+Run benchmark on all image sets with all detectors
+```
+./css587project
+```
+Individually select image categories or detectors.
+```                              
+./css587project <Image Categories>[<Detectors1>,<Detectors2>,...,<DetectorsN>]
+```
+>Note: SIFT always runs for baseline.
+>
+Individually select detectors. Run on all image sets.
+```
+./css587project [<Detectors1>,<Detectors2>,...,<DetectorsN>] 
+```
+>Note: SIFT always runs for baseline.
+
+# OpenCV installation with xfeatures2d (needed for SURF)
+Assuming folder layout:
+```
+C:/dev/opencv-4.x/              (OpenCV source)
 C:/dev/opencv_contrib-4.x/      (opencv_contrib source)
 C:/dev/opencv_build/            (build folder)
 C:/dev/opencv_install/          (install folder)
@@ -17,7 +49,7 @@ C:/dev/opencv_install/          (install folder)
 
 The build folder must be separate from the source.
 
-### Step 1 — Clone or download both repositories
+### Step 1 â€” Clone or download both repositories
 
 Within your desired directory
 
@@ -27,7 +59,7 @@ git clone https://github.com/opencv/opencv.git opencv-4.x
 git clone https://github.com/opencv/opencv_contrib.git opencv_contrib-4.x
 ```
 
-### Step 2 — Create build directory
+### Step 2 â€” Create build directory
 
 Within your desired directory
 
@@ -36,7 +68,7 @@ mkdir C:/dev/opencv_build
 cd C:/dev/opencv_build
 ```
 
-### Step 3 — Configure with CMake
+### Step 3 â€” Configure with CMake
 
 PowerShell:
 
@@ -97,29 +129,3 @@ In Visual Studio Project Properties:
 - **Linker > Input > Additional Dependencies**: e.g., opencv_world4130d.lib; opencv_xfeatures2d4130.lib (whichever is in the lin directory)
 
 - **Add to System PATH**: C:\dev\opencv_install\x64\vc18\bin
-
-# Quick start
-Clone the repo
-```
-git clone https://github.com/davecyli/css587project.git
-```
-Build
-```
-cmake --build cmake-build-debug
-```
-Execute
-```
-Usage:
-  ./css587project                           Run visual demo on all image sets
-  ./css587project --benchmark               Run full benchmark, save to results.csv
-  ./css587project --benchmark -o <file>     Run benchmark with custom output file
-  ./css587project --benchmark --save-images Save stitched images during benchmark
-  ./css587project <set1> <set2> ...         Run demo on specific image sets
-  ./css587project --help                    Show this help message
-
-Options:
-  --benchmark       Run performance benchmarks instead of visual demo
-  -o, --output      Specify output CSV file (default: results.csv)
-  --save-images     Save stitched images during benchmark
-  --no-display      Skip visual display in demo mode
-```
