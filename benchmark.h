@@ -247,7 +247,6 @@ public:
         bool ORB;
         bool BRISK;
         bool SURF;
-        bool SIFTLP;
         bool LPSIFT;
         bool LPORB;
     };
