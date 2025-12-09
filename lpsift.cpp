@@ -128,12 +128,6 @@ void LPSIFT::detect(InputArray image,
             }
         }
     }
-
-    // // Keep the strongest peaks first (helps downstream limitKeypoints calls).
-    // std::sort(keypoints.begin(), keypoints.end(),
-    //           [](const KeyPoint& a, const KeyPoint& b) {
-    //               return a.response > b.response;
-    //           });
 }
 
 /// Section 2.3 Feature Point Description

@@ -78,18 +78,7 @@ inline ImageSizeCategory getImageSizeCategory(int width, int height) {
 }
 
 inline std::vector<int> getWindowSize(int width, int height) {
-    ImageSizeCategory category = getImageSizeCategory(width, height);
     return { 16, 32, 64, 128, 256 };
-    switch (category) {
-        case ImageSizeCategory::SMALL:
-            return {32, 40};
-        case ImageSizeCategory::MEDIUM:
-            return {32, 64};
-        case ImageSizeCategory::LARGE:
-            return {256, 512};
-        default:
-            return {32, 64};
-    }
 }
 
 // ============================================================================
