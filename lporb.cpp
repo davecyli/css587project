@@ -14,6 +14,7 @@
 
 #include <opencv2/features2d.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 
 #include <algorithm>
 #include <cmath>

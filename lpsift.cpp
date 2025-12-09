@@ -1,13 +1,20 @@
 /*
+* David Li, Ben Schipunov, Kris Yu
+ * CSS 587 - Final Project: LP-SIFT
+ *
+ * lpsift.cpp
  * LP-SIFT implementation based on:
  * Hao Li et al., "Local-peak scale-invariant feature transform for fast and random image stitching"
  * (arXiv:2405.08578v2).
  *
  * The detector follows the paper's key idea:
- *  - Add a tiny linear background (alpha) to avoid flat regions with identical intensities.
- *  - Partition the image into interrogation windows of multiple sizes (L).
- *  - Collect both the local maximum and minimum within each window as keypoints (multi-scale peaks).
- *  - Use SIFT descriptors around those peak points.
+ *  - Section 2.1 Image Preprocessing
+ *      Add a tiny linear background (alpha) to avoid flat regions with identical intensities.
+ *  - Section 2.2 Feature Point Detection
+ *      Partition the image into interrogation windows of multiple sizes (L).
+ *      Collect both the local maximum and minimum within each window as keypoints (multi-scale peaks).
+ *  - Section 2.3 - Feature Point Description
+ *      Use SIFT descriptors around those peak points.
  */
 
 #include "lpsift.h"
@@ -21,25 +28,28 @@
 
 using namespace cv;
 
+/// @copydoc LPSIFT::create
 Ptr<LPSIFT> LPSIFT::create(const std::vector<int>& windowSizes,
                            const float linearNoiseAlpha) {
-    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha);
+    return makePtr<LPSIFT>(windowSizes, linearNoiseAlpha); // Use opencv smart pointers by using cv::makePtr
 }
 
+/// @copydoc LPSIFT::LPSIFT
 LPSIFT::LPSIFT(const std::vector<int>& windowSizes,
                const float linearNoiseAlpha)
-    : descriptor_(SIFT::create()),
+    : descriptor_(SIFT::create()), // Note that SIFT is instantiated here for later use
       windowSizes_(windowSizes),
       linearNoiseAlpha_(linearNoiseAlpha) {}
 
+/// @copydoc LPSIFT::getDefaultName
 String LPSIFT::getDefaultName() const {
     return "Feature2D.LPSIFT";
 }
 
-// Step 1: Image Preprocessing
+/// @copydoc LPSIFT::addLinearRamp
+// Section 2.1: Image Preprocessing
 // Adds alpha * (y * cols + x) to each pixel to break flat plateaus deterministically.
-// Based on 𝑀𝑛,𝑘(𝑖,𝑗)=𝑀𝑘(𝑖,𝑗)+[(𝑖−1)∗𝑛𝑐𝑘 +𝑗]∗𝛼 where 𝛼 ≪ 1 is the linearNoiseAlpha
-// Precondition: image.type() == CV_32F
+// Minima and maxima are biased top to bottom if a window is perfectly flat.
 void LPSIFT::addLinearRamp(Mat& image) const {
     // Input checks
     if (linearNoiseAlpha_ <= 0.0f || image.empty()) return;
@@ -52,6 +62,7 @@ void LPSIFT::addLinearRamp(Mat& image) const {
     image += ramp;
 }
 
+/// @copydoc LPSIFT::addKeypointCandidate
 bool LPSIFT::addKeypointCandidate(const int x,
                                   const int y,
                                   const int windowSize,
@@ -64,17 +75,16 @@ bool LPSIFT::addKeypointCandidate(const int x,
 
     const auto size = static_cast<float>(windowSize);
     KeyPoint kp(Point2f(static_cast<float>(x), static_cast<float>(y)), size);
-    kp.response = response;
+    kp.response = response; // difference in intensity between min and max
     kp.angle = -1.0f; // let SIFT assign orientation during compute()
     kp.octave = octaveIndex;
-    kp.class_id = windowSize; // store interrogation window size for analysis
+    kp.class_id = windowSize; // store interrogation window size
     out.push_back(kp);
     return true;
 }
 
-// Step 2: Feature Point Detection
-// This function integrates addLinearRamp (Step 1) in the call.
-// Precondition: windowSizes_ is not empty and that the value is greater than 1
+/// @copydoc LPSIFT::detect
+/// Section 2.2 Feature Point Detection
 void LPSIFT::detect(InputArray image,
                     std::vector<KeyPoint>& keypoints,
                     InputArray mask) {
@@ -99,8 +109,10 @@ void LPSIFT::detect(InputArray image,
     const int rows = gray.rows;
     const int cols = gray.cols;
 
+    // Loop through window sizes
     for (size_t idx = 0; idx < windowSizes_.size(); ++idx) {
         const int L = windowSizes_[idx];
+        // Parse image in y and x direction
         for (int y = 0; y + L <= rows; y += L) {
             for (int x = 0; x + L <= cols; x += L) {
                 Rect roi(x, y, L, L);
@@ -130,6 +142,8 @@ void LPSIFT::detect(InputArray image,
     //           });
 }
 
+/// @copydoc LPSIFT::compute
+/// Section 2.3 Feature Point Description
 void LPSIFT::compute(InputArray image,
                      std::vector<KeyPoint>& keypoints,
                      OutputArray descriptors) {
@@ -155,9 +169,10 @@ void LPSIFT::compute(InputArray image,
         gray.convertTo(gray, CV_8U);
     }
 
-    descriptor_->compute(gray, keypoints, descriptors); // Use SIFT descriptor implementation
+    descriptor_->compute(gray, keypoints, descriptors); // This uses OpenCV SIFT descriptor implementation
 }
 
+/// @copydoc LPSIFT::detectAndCompute
 void LPSIFT::detectAndCompute(InputArray image,
                               InputArray mask,
                               std::vector<KeyPoint>& keypoints,
