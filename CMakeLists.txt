@@ -11,28 +11,12 @@ find_package(OpenCV REQUIRED)
 add_executable(css587project
     main.cpp
     lpsift.cpp
+    lporb.cpp
     benchmark.cpp
-        lporb.cpp
-        lporb.h
 )
 
 target_include_directories(css587project PRIVATE ${OpenCV_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(css587project PRIVATE ${OpenCV_LIBS})
-
-add_executable(lpsift_tool
-    tools/lpsift_tool.cpp
-    lpsift.cpp
-)
-
-target_include_directories(lpsift_tool PRIVATE ${OpenCV_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(lpsift_tool PRIVATE ${OpenCV_LIBS})
-
-add_executable(fft_window_tool
-    tools/fft_window_tool.cpp
-)
-
-target_include_directories(fft_window_tool PRIVATE ${OpenCV_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(fft_window_tool PRIVATE ${OpenCV_LIBS})
 
 # Define the destination directory variable
 set(OUTPUT_IMAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/images")
