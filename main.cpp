@@ -17,7 +17,19 @@
  *
  * Usage:
  *   ./css587project                      - Run visual demo on all image sets
+ *   
  *   ./css587project <set1> <set2> ...    - Run demo on specific image sets
+ *      - Example: ./css587project buildings street
+ * 
+ *	 ./css587project <set1>[det1,det2,...] ... - Run demo on specific image sets with detector filters (SIFT runs regardless for H matrix comparison)
+ *      - Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+ *		- Example: ./css587project buildings[ORB,BRISK] street[LPSIFT]
+ *   
+ *   ./css587project [det1,det2,...]      - Run all buildings with specified detectors (SIFT runs regardless for H matrix comparison)
+ *      - Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+ *      - Example: ./css587project [LPSIFT]
+ *  
+ *   ./css587project --help               - Show help message
  */
 
 #include <string>
@@ -65,26 +77,21 @@ int WINDOW_HEIGHT = 600;
 void printUsage(const char* programName) {
 	cout << "CSS 587 Final Project: LP-SIFT Implementation and Benchmarking\n"
 		<< "David Li, Ben Schipunov, Kris Yu\n\n"
-		<< "Usage:\n"
-		<< "  " << programName << "                           Run visual demo on all image sets\n"
+		<< "Usage:\n\n"
+		<< "  " << programName << "                           Run visual demo on all image sets\n\n"
 		<< "  " << programName << " <set1> <set2> ...         Run demo on specific image sets\n"
-		<< "  " << programName << " --help                    Show this help message\n\n"
+		<< "     Example: buildings street\n\n"
+		<< "  " << programName << " <set1>[det1,det2,...] ... Run demo on specific image sets with detector filters (SIFT runs regardless for H matrix comparison)\n"
+		<< "     Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)\n"
+		<< "     Example: buildings[ORB,BRISK] street[LPSIFT]\n\n"
+		<< "  " << programName << " [det1,det2,...]           Run all image sets with specified detectors (SIFT runs regardless for H matrix comparison)\n"
+		<< "     Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)\n"
+		<< "     Example: [LPSIFT]\n\n"
+		<< "  " << programName << " --help                    Show this help message\n\n\n"
 		<< endl;
 }
 
-// Helper function to limit keypoints by keeping the strongest ones
-// Uses MAX_KEYPOINTS_BF constant from benchmark.h for BFMatcher limit
-void limitKeypoints(vector<KeyPoint>& kpts, int maxCount) {
-	if (static_cast<int>(kpts.size()) > maxCount) {
-		// Sort by response (strength) descending and keep top N
-		sort(kpts.begin(), kpts.end(),
-			[](const KeyPoint& a, const KeyPoint& b) {
-				return a.response > b.response;
-			});
-		kpts.resize(maxCount);
-	}
-}
-
+// Helper function to split a string by a delimiter
 std::vector<std::string> splitString(const std::string& s, char delimiter) {
 	std::vector<std::string> tokens;
 	std::string token;
@@ -97,13 +104,16 @@ std::vector<std::string> splitString(const std::string& s, char delimiter) {
 	return tokens;
 }
 
+// parse a command argument token for image set ID and optional detector filters
 void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, map<string, BenchmarkRunner::DetectorFilter>& filteredDetectors) {
 	
 	int squareBracketStart = imageSetIdArg.find("[");
 
+	// if square bracket found, parse detector filters
 	if (squareBracketStart != string::npos) {
 		int squareBracketEnd = imageSetIdArg.find("]");
 
+		// handle syntax errors
 		if (squareBracketEnd != imageSetIdArg.length() - 1) {
 			throw new invalid_argument("Invalid descriptor filter syntax");
 		}
@@ -112,12 +122,16 @@ void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, 
 			throw new invalid_argument("Empty descriptor filter");
 		}
 
+		// get substring within brackets
 		string detectorsCommaDelimited = imageSetIdArg.substr(squareBracketStart + 1, squareBracketEnd - squareBracketStart - 1);
 
+		// split by comma
 		vector<string> detectorTokens = splitString(detectorsCommaDelimited, ',');
 
+		// init filter struct
 		BenchmarkRunner::DetectorFilter filter = { false, false, false, false, false, false };
 
+		// parse detector sub-tokens
 		for (const string& token : detectorTokens) {
 			if (token == "SIFT") filter.SIFT = true;
 			else if (token == "ORB") filter.ORB = true;
@@ -129,9 +143,6 @@ void parseImageSetIdArg(string imageSetIdArg, set<string>& filteredImageSetIds, 
 				throw new invalid_argument("Unknown detector in filter: " + token);
 			}
 		}
-
-		cout << "SIFT : " << filter.SIFT << ", ORB: " << filter.ORB << ", BRISK: " << filter.BRISK
-			<< ", SURF: " << filter.SURF << ", LPSIFT: " << filter.LPSIFT << ", LPORB: " << filter.LPORB << endl;
 
 		string imageSetId = imageSetIdArg.substr(0, squareBracketStart);
 
@@ -233,23 +244,37 @@ int main(int argc, char* argv[]) {
 	set<string> filteredImageIds;
 	map<string, BenchmarkRunner::DetectorFilter> filteredDetectors;
 
+	cout << "Arguments:\n";
 	for (int i = 1; i < argc; i++) {
 		string arg = argv[i];
+		cout << "  " << arg << endl;
 
 		if (arg == "--help" || arg == "-h") {
+			cout << endl;
 			printUsage(argv[0]);
 			return 0;
 		}
 		else if (arg[0] != '-') {
 			// Assume it's an image set filter
-			parseImageSetIdArg(arg, filteredImageIds, filteredDetectors);
+			try {
+				parseImageSetIdArg(arg, filteredImageIds, filteredDetectors);
+			}
+			catch (const invalid_argument& e) {
+				cout << endl;
+				cerr << "Error parsing argument: " << e.what() << endl;
+				printUsage(argv[0]);
+				return 1;
+			}
 		}
 		else {
+			cout << endl;
 			cerr << "Unknown option: " << arg << endl;
 			printUsage(argv[0]);
 			return 1;
 		}
 	}
+
+	cout << endl;
 
 	try {
 		return runBenchmark(filteredImageIds, filteredDetectors);
