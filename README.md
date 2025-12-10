@@ -3,7 +3,7 @@ Authors: David Li, Ben Schipunov, Kris Yu
 
 # -> Additional Submission Items
 
-**Results CSV output:** Located at `/results.xlsx`   
+**Results spreadsheet output:** Located at `/results.xlsx`   
 **Video Demo:** Located at `/lpsift_final_demo.mp4`
 
 # Summary
