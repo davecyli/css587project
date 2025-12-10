@@ -1,6 +1,11 @@
 # CSS587 Final Project: Local Peaks SIFT (LP-SIFT)
 Authors: David Li, Ben Schipunov, Kris Yu 
 
+# -> Additional Submission Items
+
+**Results CSV output:** Located at `/results.xlsx`   
+**Video Demo:** Located at `/lpsift_final_demo.mp4`
+
 # Summary
 This project looks to explore and re-implement LP-SIFT in C++ from this paper: https://arxiv.org/abs/2405.08578
 
@@ -26,17 +31,46 @@ Run benchmark on all image sets with all detectors
 ```
 ./css587project
 ```
-Individually select image categories or detectors.
+Run demo on select image categories.
 ```                              
-./css587project <Image Categories>[<Detectors1>,<Detectors2>,...,<DetectorsN>]
+./css587project <set1> <set2> ...
 ```
+>Example: ./css587project buildings street
+>
 >Note: SIFT always runs for baseline.
 >
-Individually select detectors. Run on all image sets.
+Run demo on specific image sets with detector filters
 ```
-./css587project [<Detectors1>,<Detectors2>,...,<DetectorsN>] 
+./css587project <set1>[det1,det2,...] ...
 ```
+>Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+>
+>Example: ./css587project buildings[ORB,BRISK] street[LPSIFT]
+>
 >Note: SIFT always runs for baseline.
+>
+Run all buildings with specified detectors
+```
+./css587project [det1,det2,...]
+```
+>Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+>
+>Example: ./css587project [LPSIFT]
+>
+>Note: SIFT always runs for baseline.
+>
+Show help message
+```
+./css587project --help
+```
+
+## Output
+
+### Stitched Images
+The output images are in the relative directory of `benchmark_output/` from the executable.
+
+### Benchmark Results
+Default output prefix is saved as `results.csv` but if the file is in use and to avoid data loss (typically when opening the CSV files in Excel), the files are saved in the next available accumulating suffix as `results_1.csv`, `results_2.csv`, and so on. The file name that the results are saved in will be displayed in the console.
 
 # OpenCV installation with xfeatures2d (needed for SURF)
 Assuming folder layout:
