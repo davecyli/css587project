@@ -28,15 +28,36 @@ Run benchmark on all image sets with all detectors
 ```
 Individually select image categories or detectors.
 ```                              
-./css587project <Image Categories>[<Detectors1>,<Detectors2>,...,<DetectorsN>]
+./css587project <set1> <set2> ...
 ```
+>Example: ./css587project buildings street
+>
 >Note: SIFT always runs for baseline.
 >
-Individually select detectors. Run on all image sets.
+Run demo on specific image sets with detector filters
 ```
-./css587project [<Detectors1>,<Detectors2>,...,<DetectorsN>] 
+./css587project <set1>[det1,det2,...] ...
 ```
+>Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+>
+>Example: ./css587project buildings[ORB,BRISK] street[LPSIFT]
+>
 >Note: SIFT always runs for baseline.
+>
+Run all buildings with specified detectors
+```
+./css587project [det1,det2,...]
+```
+>Options: [SIFT,ORB,BRISK,SURF,LPSIFT,LPORB] (case sensitive, must be uppercase)
+>
+>Example: ./css587project [LPSIFT]
+>
+>Note: SIFT always runs for baseline.
+>
+Show help message
+```
+./css587project --help
+```
 
 # OpenCV installation with xfeatures2d (needed for SURF)
 Assuming folder layout:
