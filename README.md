@@ -1,6 +1,11 @@
 # CSS587 Final Project: Local Peaks SIFT (LP-SIFT)
 Authors: David Li, Ben Schipunov, Kris Yu 
 
+# -> Additional Submission Items
+
+**Results CSV output:** Located at `/results.xlsx`   
+**Video Demo:** Located at `/final_demo.mp4`
+
 # Summary
 This project looks to explore and re-implement LP-SIFT in C++ from this paper: https://arxiv.org/abs/2405.08578
 
