@@ -26,7 +26,7 @@ Run benchmark on all image sets with all detectors
 ```
 ./css587project
 ```
-Individually select image categories or detectors.
+Run demo on select image categories.
 ```                              
 ./css587project <set1> <set2> ...
 ```
@@ -58,6 +58,14 @@ Show help message
 ```
 ./css587project --help
 ```
+
+## Output
+
+### Stitched Images
+The output images are in the relative directory of `benchmark_output/` from the executable.
+
+### Benchmark Results
+Default output prefix is saved as `results.csv` but if the file is in use and to avoid data loss (typically when opening the CSV files in Excel), the files are saved in the next available accumulating suffix as `results_1.csv`, `results_2.csv`, and so on. The file name that the results are saved in will be displayed in the console.
 
 # OpenCV installation with xfeatures2d (needed for SURF)
 Assuming folder layout:
